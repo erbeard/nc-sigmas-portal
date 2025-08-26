@@ -1,0 +1,164 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Documents • NC Sigma Portal</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/styles/site.css">
+<style>
+  .doc-card:hover{background:#f8fafc}
+  .tag{display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;padding:.1rem .4rem;border-radius:.5rem;margin-right:.25rem;font-size:.75rem}
+</style>
+</head><body class="bg-light">
+<nav class="navbar navbar-dark">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a class="navbar-brand d-flex align-items-center brand" href="/">
+      <img src="/img/nc-crest.png" alt="NC Crest" onerror="this.style.display='none'">
+      <span>NC Sigma Portal</span>
+    </a>
+    <div class="navbar-nav">
+      <a class="nav-link" href="/documents.html">Documents</a>
+      <a class="nav-link" href="/media.html">Media</a>
+      <a class="nav-link" href="/chapters.html">Chapters</a>
+      <a class="nav-link" href="/admin">Admin</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-4">
+  <div class="d-flex align-items-end gap-2 flex-wrap mb-3">
+    <div class="flex-grow-1">
+      <label class="form-label mb-1">Search</label>
+      <input id="q" type="text" class="form-control" placeholder="Title, type, group, tag…">
+    </div>
+    <div>
+      <label class="form-label mb-1">Type</label>
+      <select id="type" class="form-select">
+        <option value="">All</option>
+        <option>Policy</option>
+        <option>Form</option>
+        <option>Guide</option>
+        <option>Bylaws</option>
+        <option>Minutes</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label mb-1">Group</label>
+      <input id="group" type="text" class="form-control" placeholder="(e.g., State, Region)">
+    </div>
+    <div>
+      <label class="form-label mb-1">Visibility</label>
+      <select id="vis" class="form-select">
+        <option value="">All</option>
+        <option>Public</option>
+        <option>Brothers</option>
+        <option>Officers</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label mb-1">Sort</label>
+      <select id="sort" class="form-select">
+        <option value="date_desc">Newest</option>
+        <option value="date_asc">Oldest</option>
+        <option value="title_asc">Title A–Z</option>
+        <option value="title_desc">Title Z–A</option>
+      </select>
+    </div>
+    <div>
+      <button id="clear" class="btn btn-outline-secondary">Clear</button>
+    </div>
+  </div>
+
+  <div id="empty" class="alert alert-light border d-none">No documents found.</div>
+  <div id="docs" class="list-group shadow-sm"></div>
+</div>
+
+<script>
+let allDocs = [];
+
+function norm(s){ return (s||'').toString().toLowerCase(); }
+function toDateStr(s){
+  if(!s) return '';
+  const d = new Date(s);
+  return isNaN(d) ? s : d.toISOString().slice(0,10);
+}
+function parseTags(s){
+  if(!s) return [];
+  // accepts comma or semicolon separated
+  return s.split(/[,;]+/).map(t => t.trim()).filter(Boolean);
+}
+
+function applyFilters(){
+  const q = norm(document.getElementById('q').value);
+  const t = document.getElementById('type').value;
+  const g = norm(document.getElementById('group').value);
+  const v = document.getElementById('vis').value;
+  const sort = document.getElementById('sort').value;
+
+  let rows = allDocs.filter(d=>{
+    const inQ = !q || [d.title, d.doc_type, d.group, d.visibility, d.tags].some(x=> norm(x).includes(q));
+    const inT = !t || (d.doc_type===t);
+    const inG = !g || norm(d.group).includes(g);
+    const inV = !v || (d.visibility===v);
+    return inQ && inT && inG && inV;
+  });
+
+  // sorting
+  rows.sort((a,b)=>{
+    if (sort==='date_desc') return (b.publish_date||'').localeCompare(a.publish_date||'');
+    if (sort==='date_asc')  return (a.publish_date||'').localeCompare(b.publish_date||'');
+    if (sort==='title_asc') return (a.title||'').localeCompare(b.title||'');
+    if (sort==='title_desc')return (b.title||'').localeCompare(a.title||'');
+    return 0;
+  });
+
+  render(rows);
+}
+
+function render(rows){
+  const container = document.getElementById('docs');
+  container.innerHTML = '';
+  document.getElementById('empty').classList.toggle('d-none', rows.length>0);
+
+  rows.forEach(d=>{
+    const a = document.createElement('a');
+    a.className = 'list-group-item list-group-item-action doc-card';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.href = d.file_url || '#';
+
+    const tags = parseTags(d.tags).map(t=> `<span class="tag">${t}</span>`).join(' ');
+    a.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="me-3">
+          <div class="fw-semibold">${d.title || '(Untitled)'}</div>
+          <div class="text-muted small">${d.doc_type || '—'} ${d.group ? ' • ' + d.group : ''} ${d.visibility ? ' • ' + d.visibility : ''}</div>
+          ${tags ? `<div class="mt-1">${tags}</div>` : ''}
+        </div>
+        <div class="text-end small text-muted" style="min-width:8rem">${toDateStr(d.publish_date)}</div>
+      </div>`;
+    container.appendChild(a);
+  });
+}
+
+async function init(){
+  const res = await fetch('/api/documents');
+  allDocs = await res.json();
+  applyFilters();
+
+  ['q','type','group','vis','sort'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', applyFilters);
+    document.getElementById(id).addEventListener('change', applyFilters);
+  });
+  document.getElementById('clear').onclick = ()=>{
+    document.getElementById('q').value='';
+    document.getElementById('type').value='';
+    document.getElementById('group').value='';
+    document.getElementById('vis').value='';
+    document.getElementById('sort').value='date_desc';
+    applyFilters();
+  };
+}
+init();
+</script>
+</body></html>

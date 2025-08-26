@@ -1,0 +1,245 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Chapter • NC Sigma Portal</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/styles/site.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  .chapter-crest{height:72px;width:auto;border-radius:8px;object-fit:contain;background:#fff}
+  .president-img{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#e5e7eb}
+  .level-badge{display:inline-block;padding:.35rem .6rem;border-radius:.5rem;font-weight:600}
+  .level-founders{background:#111827;color:#fff}
+  .level-platinum{background:#e5e7eb}
+  .level-sapphire{background:#dbeafe}
+  .level-diamond{background:#fef3c7}
+  .level-gold{background:#fde68a}
+  .level-silver{background:#f3f4f6}
+  .level-bronze{background:#fef2f2}
+  .delta-positive{color:#16a34a; font-weight: 600;} /* green */
+  .delta-negative{color:#dc2626; font-weight: 600;} /* red */
+  .delta-zero{color:#6b7280; font-weight: 600;}     /* gray */
+</style>
+</head><body class="bg-light">
+<nav class="navbar navbar-dark">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a class="navbar-brand d-flex align-items-center brand" href="/chapters.html">
+      <img src="/img/nc-crest.png" alt="NC Crest" onerror="this.style.display='none'">
+      <span>NC Sigma Portal</span>
+    </a>
+    <div class="navbar-nav">
+      <a class="nav-link" href="/documents.html">Documents</a>
+      <a class="nav-link" href="/media.html">Media</a>
+      <a class="nav-link" href="/chapters.html">Chapters</a>
+      <a class="nav-link" href="/calendar">Calendar</a>
+      <a class="nav-link" href="/admin">Admin</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-4">
+  <div id="loading" class="text-muted">Loading…</div>
+  <div id="content" style="display:none;">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <img id="crest" class="chapter-crest" src="" alt="Chapter crest" onerror="this.style.display='none'">
+        <div>
+          <h3 id="title" class="mb-1"></h3>
+          <div class="small text-muted" id="subtitle"></div>
+        </div>
+      </div>
+
+      <div class="d-flex align-items-stretch gap-3 flex-wrap">
+        <div class="card text-center" style="min-width:260px;">
+          <div class="card-body">
+            <div class="h6 text-muted mb-1">Total Brothers</div>
+            <div class="d-flex align-items-baseline justify-content-center gap-2">
+              <div id="latestActive" class="display-6 fw-bold mb-0">—</div>
+              <div id="latestDelta" class="mb-0 small"> </div>
+            </div>
+            <div class="small text-muted" id="asof">as of —</div>
+          </div>
+        </div>
+
+        <div class="card" style="min-width:260px;">
+          <div class="card-body">
+            <div class="h6 text-muted mb-1">Current Level</div>
+            <div id="levelBadge" class="level-badge">—</div>
+            <div class="small text-muted mt-1" id="toNext">—</div>
+          </div>
+        </div>
+
+        <div class="card" style="min-width:320px;">
+          <div class="card-body d-flex align-items-center gap-3">
+            <img id="presidentPhoto" class="president-img" src="/img/avatar-placeholder.png" alt="President headshot"
+                 onerror="this.src='/img/avatar-placeholder.png'">
+            <div>
+              <div class="h6 mb-1">Chapter President</div>
+              <div id="presidentName">—</div>
+              <div><a id="presidentEmail" href="#" target="_blank"></a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mt-3">
+      <div class="col-md-5">
+        <div class="card"><div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5">Type</dt><dd class="col-7" id="type">—</dd>
+            <dt class="col-5">Status</dt><dd class="col-7" id="status">—</dd>
+            <dt class="col-5">Location</dt><dd class="col-7" id="city">—</dd>
+            <dt class="col-5">University</dt><dd class="col-7" id="university">—</dd>
+            <dt class="col-5">Charter Date</dt><dd class="col-7" id="charter">—</dd>
+          </dl>
+        </div></div>
+      </div>
+      <div class="col-md-7">
+        <div class="card"><div class="card-body">
+          <h6 class="mb-3">Active Members by Year</h6>
+          <canvas id="growth" height="140"></canvas>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// LEVEL DEFINITIONS
+const SCALES = {
+  alumni: [
+    { name: "Founders Level", min: 201, cls: "level-founders" },
+    { name: "Platinum Level", min: 151, cls: "level-platinum" },
+    { name: "Sapphire Level", min: 101, cls: "level-sapphire" },
+    { name: "Diamond Level", min: 76,  cls: "level-diamond" },
+    { name: "Gold Level",     min: 56,  cls: "level-gold" },
+    { name: "Silver Level",   min: 36,  cls: "level-silver" },
+    { name: "Bronze Level",   min: 15,  cls: "level-bronze" }
+  ],
+  collegiate: [
+    { name: "Founders Level", min: 76, cls: "level-founders" },
+    { name: "Platinum Level", min: 66, cls: "level-platinum" },
+    { name: "Sapphire Level", min: 51, cls: "level-sapphire" },
+    { name: "Diamond Level",  min: 36, cls: "level-diamond" },
+    { name: "Gold Level",     min: 21, cls: "level-gold" },
+    { name: "Silver Level",   min: 11, cls: "level-silver" },
+    { name: "Bronze Level",   min: 5,  cls: "level-bronze" }
+  ]
+};
+
+function evaluateLevel(latestActive, chapterType){
+  const scaleKey = (chapterType||"").toLowerCase() === "alumni" ? "alumni" : "collegiate";
+  const scale = SCALES[scaleKey];
+  let current = { name:"Unranked", min:0, cls:"" };
+  for (const s of scale){ if (latestActive >= s.min){ current = s; break; } }
+  const idx = scale.findIndex(s => s.name === current.name);
+  const nextHigher = idx > 0 ? scale[idx-1] : null;
+  let toNextText = "—";
+  if (nextHigher){
+    const needed = Math.max(0, nextHigher.min - latestActive);
+    toNextText = needed === 0 ? "At highest level" : `${needed} to reach ${nextHigher.name}`;
+  } else {
+    toNextText = current.name === "Founders Level" ? "At highest level" : "—";
+  }
+  return { current, toNextText };
+}
+
+function idFromPath(){
+  const m = location.pathname.match(/\/chapter\/([0-9a-fA-F-]+)/);
+  if (m) return m[1];
+  return new URLSearchParams(location.search).get('id');
+}
+
+// format to mm/dd/yyyy
+function fmtAsOf(iso){
+  if (!iso) return 'as of —';
+  const d = new Date(iso);
+  if (isNaN(d)) return 'as of —';
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const yyyy = d.getFullYear();
+  return `as of ${mm}/${dd}/${yyyy}`;
+}
+
+async function main(){
+  const id = idFromPath();
+  if(!id){ document.getElementById('loading').textContent='Missing chapter id'; return; }
+
+  // Chapter
+  const chRes = await fetch('/api/chapters/'+id);
+  if(!chRes.ok){ document.getElementById('loading').textContent='Chapter not found'; return; }
+  const c = await chRes.json();
+
+  document.getElementById('title').textContent = c.name || 'Chapter';
+  document.getElementById('subtitle').textContent = [c.type, c.city].filter(Boolean).join(" • ");
+  document.getElementById('type').textContent = c.type || '—';
+  document.getElementById('status').textContent = c.status || '—';
+  document.getElementById('city').textContent = c.city || '—';
+  document.getElementById('university').textContent = c.university || '—';
+  document.getElementById('charter').textContent = c.charter_date || c.charterDate || '—';
+
+  // Profile (crest/president)
+  const pr = await (await fetch(`/api/chapters/${id}/profile`)).json();
+  if (pr && pr.crest_url){
+    const crest = document.getElementById('crest');
+    crest.src = pr.crest_url; crest.style.display = '';
+  }
+  const photo = document.getElementById('presidentPhoto');
+  if (pr && pr.president_photo_url) photo.src = pr.president_photo_url;
+  document.getElementById('presidentName').textContent = pr?.president_name || '—';
+  const email = pr?.president_email || '';
+  document.getElementById('presidentEmail').textContent = email;
+  document.getElementById('presidentEmail').href = email ? `mailto:${email}` : '#';
+
+  // Yearly history
+  const history = await (await fetch(`/api/chapters/${id}/history-yearly`)).json();
+  const labels = history.map(r => `${r.year}`);
+  const values = history.map(r => r.active_members ?? r.activeMembers);
+
+  // latest + delta vs previous YEAR (not last upload)
+  let latestVal = 0, latestYear = null, delta = 0;
+  if (history.length){
+    const last = history[history.length-1];
+    latestVal = (last.active_members ?? last.activeMembers) || 0;
+    latestYear = last.year;
+    if (history.length >= 2){
+      const prev = history[history.length-2];
+      const prevVal = (prev.active_members ?? prev.activeMembers) || 0;
+      delta = latestVal - prevVal;
+    } else {
+      delta = 0;
+    }
+  }
+
+  // As of: last yearly upload date
+  const lastUp = await (await fetch('/api/stats/yearly-last-upload')).json();
+  document.getElementById('asof').textContent = fmtAsOf(lastUp?.last_upload_at);
+
+  // Set latest and delta
+  document.getElementById('latestActive').textContent = latestVal.toLocaleString();
+  const dEl = document.getElementById('latestDelta');
+  const sign = delta > 0 ? '+' : (delta < 0 ? '' : '±');
+  dEl.textContent = `(${sign}${delta.toLocaleString()})`;
+  dEl.className = delta > 0 ? 'delta-positive' : (delta < 0 ? 'delta-negative' : 'delta-zero');
+
+  // Level + to next
+  const { current, toNextText } = evaluateLevel(latestVal, c.type);
+  const badge = document.getElementById('levelBadge');
+  badge.textContent = current.name;
+  badge.className = `level-badge ${current.cls}`;
+  document.getElementById('toNext').textContent = toNextText;
+
+  // Chart
+  new Chart(document.getElementById('growth'), {
+    type:'line',
+    data:{ labels, datasets:[{ label:'Active Members (year-end)', data: values }] }
+  });
+
+  document.getElementById('loading').style.display='none';
+  document.getElementById('content').style.display='';
+}
+main();
+</script>
+</body></html>
