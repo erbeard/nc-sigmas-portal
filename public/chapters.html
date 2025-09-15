@@ -4,20 +4,70 @@
 <title>Chapters • NC Sigma Portal</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="/styles/site.css">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;900&display=swap" rel="stylesheet">
 <style>
-  #map{height:52vh}
-  .chip{display:inline-block;padding:.25rem .5rem;border-radius:9999px;font-size:.875rem;margin-right:.5rem;cursor:pointer;user-select:none}
-  .chip-collegiate{background:#e7f1ff;border:1px solid #93c5fd;color:#0b2b7e}
-  .chip-alumni{background:#fff1f0;border:1px solid #fca5a5;color:#b91c1c}
+  :root{
+    --royal:#0b2b7e;           /* brand royal blue */
+    --royal-700:#1D4ED8;       /* bright royal for accents */
+    --light-blue:#60A5FA;      /* light blue (collegiate) */
+    --text:#0f172a;
+  }
+
+  /* --- Page typography & headers --- */
+  body { color: var(--text); }
+  .section-title{
+    font-weight:800;
+    letter-spacing:.2px;
+    margin: .25rem 0 .6rem 0;
+  }
+
+  /* --- KPI tiles (top band) --- */
+  .kpi-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:.75rem}
+  .kpi{border-radius:14px;padding:1.0rem 1.1rem;color:#fff;position:relative;overflow:hidden}
+  .kpi .k-title{opacity:.95;font-weight:700;letter-spacing:.2px}
+  .kpi .k-num{font-weight:800;line-height:1; font-size:clamp(28px,6.2vw,56px);}
+  .kpi-primary{background:linear-gradient(135deg, var(--royal) 0%, #0d3aa8 100%)}
+  .kpi-secondary{background:linear-gradient(135deg, #2a52c3 0%, #4567d6 100%)}
+  .kpi-tertiary{background:linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)}
+  .kpi:after{content:"";position:absolute;right:-30px;bottom:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08)}
+  .kpi:before{content:"";position:absolute;right:40px;bottom:-50px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.06)}
+  .kpi-col-6{grid-column:span 6}
+  .kpi-col-3{grid-column:span 3}
+  @media (max-width: 992px){
+    .kpi-col-6{grid-column:span 12}
+    .kpi-col-3{grid-column:span 6}
+  }
+  @media (max-width: 576px){
+    .kpi-col-3{grid-column:span 12}
+  }
+
+  /* chips & list */
+  .chip{display:inline-block;padding:.35rem .75rem;border-radius:9999px;font-size:.9rem;margin-right:.5rem;cursor:pointer;user-select:none;font-weight:600}
+  .chip-collegiate{background:#ebf5ff;border:1px solid #93c5fd;color:#1e40af}
+  .chip-alumni{background:#e7edff;border:1px solid #93c5fd;color:#0b2b7e}
   .chip-inactive{background:#f3f4f6;border:1px solid #d1d5db;color:#374151}
-  .chip-selected{box-shadow:0 0 0 2px rgba(0,0,0,.05) inset; filter:saturate(1.2)}
-  .chapter-link{display:block;padding:.5rem .75rem;border-bottom:1px solid #eee;text-decoration:none;color:#0b2b7e}
+  .chip-selected{box-shadow:0 0 0 2px rgba(0,0,0,.06) inset; filter:saturate(1.1)}
+
+  .chapter-link{display:block;padding:.65rem .85rem;border-bottom:1px solid #eef2f7;text-decoration:none;color:#0b2b7e;font-weight:600}
+  .chapter-link small{font-weight:500}
   .chapter-link:hover{background:#f8fafc}
   .badge-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.5rem;vertical-align:middle}
-  .dot-collegiate{background:#2563EB}
-  .dot-alumni{background:#DC2626}
+  .dot-collegiate{background:#60A5FA}
+  .dot-alumni{background:#1D4ED8}
   .dot-inactive{background:#6B7280}
+
+  #map{height:52vh}
   .table-sm td, .table-sm th { padding: .35rem .5rem; }
+  .level-icon{width:18px;height:18px;object-fit:contain;margin-right:.35rem;vertical-align:middle}
+  .card-header .section-title{margin:0}
+
+  /* PIA grid */
+  .pia-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:.75rem}
+  .pia-col-6{grid-column:span 6}
+  .pia-col-12{grid-column:span 12}
+  @media (max-width: 992px){ .pia-col-6{grid-column:span 12} }
+
+  .mini-h{font-weight:700;color:#334155;margin-bottom:.35rem}
 </style>
 </head><body class="bg-light">
 <nav class="navbar navbar-dark">
@@ -26,20 +76,49 @@
       <img src="/img/nc-crest.png" alt="NC Crest" onerror="this.style.display='none'">
       <span>NC Sigma Portal</span>
     </a>
-    <div class="navbar-nav">
-      <a class="nav-link" href="/documents.html">Documents</a>
-      <a class="nav-link" href="/media.html">Media</a>
-      <a class="nav-link active" href="/chapters.html">Chapters</a>
-      <a class="nav-link" href="/calendar">Calendar</a>
-      <a class="nav-link" href="/admin">Admin</a>
-    </div>
+
+    <ul class="navbar-nav flex-row align-items-center gap-3">
+      <li class="nav-item"><a class="nav-link" href="/resources.html">Resources</a></li>
+      <li class="nav-item"><a class="nav-link" href="/chapters.html">Chapters</a></li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="/conferences/2025.html" id="confMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+          Conferences
+        </a>
+        <ul class="dropdown-menu" aria-labelledby="confMenu">
+          <li><a class="dropdown-item" href="/conferences/2025.html">2025 State Conference</a></li>
+          <li><a class="dropdown-item" href="/conferences/2026.html">2026 Regional Conference</a></li>
+        </ul>
+      </li>
+      <li class="nav-item"><a class="nav-link" href="/calendar">Calendar</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+    </ul>
   </div>
 </nav>
 
 <div class="container py-4">
+
+  <!-- KPI ROW -->
+  <div class="kpi-grid mb-3">
+    <div class="kpi kpi-primary kpi-col-6">
+      <div class="k-title">Total Brothers</div>
+      <div id="kpi-total" class="k-num">—</div>
+      <div id="kpi-asof" class="small">as of —</div>
+      <div id="kpi-growth" class="small">—</div>
+    </div>
+    <div class="kpi kpi-secondary kpi-col-3">
+      <div class="k-title">Alumni Brothers</div>
+      <div id="kpi-alumni" class="k-num">—</div>
+    </div>
+    <div class="kpi kpi-tertiary kpi-col-3">
+      <div class="k-title">Collegiate Brothers</div>
+      <div id="kpi-collegiate" class="k-num">—</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
   <div class="row g-3 align-items-center mb-2">
     <div class="col-12">
-      <h3 class="mb-2">Chapters</h3>
+      <div class="section-title">Filters</div>
       <div id="kpis" class="mb-2">
         <span id="k-total" class="chip"       role="button" tabindex="0">Active: 0</span>
         <span id="k-collegiate" class="chip chip-collegiate" role="button" tabindex="0">Collegiate: 0</span>
@@ -55,9 +134,7 @@
     <div class="col-lg-4">
       <div class="card">
         <div class="card-header">
-          <div class="d-flex align-items-center gap-2">
-            <span>Chapter List</span>
-          </div>
+          <div class="section-title">Chapter List</div>
         </div>
         <div class="p-2">
           <input id="chapterSearch" class="form-control" placeholder="Search chapters by name or city…">
@@ -66,51 +143,35 @@
       </div>
     </div>
 
-    <!-- Right: totals + map + lists -->
+    <!-- Right: map + top 5 membership -->
     <div class="col-lg-8">
-      <!-- Totals card -->
-      <div class="card mb-2">
-        <div class="card-body d-flex flex-wrap gap-4">
-          <div>
-            <div class="text-muted small">Total Brothers</div>
-            <div id="t-total" class="h4 mb-0">—</div>
-            <div id="t-date" class="small text-muted">as of —</div>
-          </div>
-          <div>
-            <div class="text-muted small">Total Alumni</div>
-            <div id="t-alumni" class="h4 mb-0">—</div>
-          </div>
-          <div>
-            <div class="text-muted small">Total Collegiate</div>
-            <div id="t-collegiate" class="h4 mb-0">—</div>
-          </div>
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title">Map</div>
+        </div>
+        <div id="map" class="rounded"></div>
+        <div class="p-2">
+          <span class="chip"><span class="badge-dot dot-collegiate"></span>Collegiate</span>
+          <span class="chip"><span class="badge-dot dot-alumni"></span>Alumni</span>
+          <span class="chip"><span class="badge-dot dot-inactive"></span>Inactive</span>
         </div>
       </div>
 
-      <!-- Map -->
-      <div id="map" class="rounded border mb-3"></div>
-      <div class="mb-3">
-        <span class="chip"><span class="badge-dot dot-collegiate"></span>Collegiate</span>
-        <span class="chip"><span class="badge-dot dot-alumni"></span>Alumni</span>
-        <span class="chip"><span class="badge-dot dot-inactive"></span>Inactive</span>
-      </div>
-
-      <!-- Top 5 by membership -->
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Top 5 by Membership</span>
+          <span class="section-title">Top 5 by Membership</span>
           <small class="text-muted" id="tmYear">—</small>
         </div>
         <div class="card-body">
           <div class="row">
             <div class="col-md-6">
-              <div class="mini mb-1 fw-semibold">Collegiate</div>
+              <div class="mini-h">Collegiate</div>
               <table class="table table-sm">
                 <tbody id="tmCollegiate"></tbody>
               </table>
             </div>
             <div class="col-md-6">
-              <div class="mini mb-1 fw-semibold">Alumni</div>
+              <div class="mini-h">Alumni</div>
               <table class="table table-sm">
                 <tbody id="tmAlumni"></tbody>
               </table>
@@ -121,15 +182,551 @@
       </div>
     </div>
   </div>
+
+  <hr class="my-3">
+<div class="d-flex justify-content-between align-items-center">
+  <span class="section-title" style="font-size:1.1rem">Top 5 by Members Added (YoY)</span>
+  <small class="text-muted" id="tgYear">—</small>
+</div>
+<div class="row">
+  <div class="col-md-6">
+    <div class="mini-h">Collegiate</div>
+    <table class="table table-sm">
+      <tbody id="tgCollegiate"></tbody>
+    </table>
+  </div>
+  <div class="col-md-6">
+    <div class="mini-h">Alumni</div>
+    <table class="table table-sm">
+      <tbody id="tgAlumni"></tbody>
+    </table>
+  </div>
+</div>
+
+
+  <!-- ================= PIPELINE OPPORTUNITY TRACKER (paste into chapters.html) ================= -->
+<div class="card mt-4" id="pipelineTrackerCard">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span class="fw-bold">Collegiate → Alumni Pipeline Opportunity Tracker</span>
+    <div class="d-flex align-items-center gap-2">
+      <input id="pipelineSearch" class="form-control form-control-sm" placeholder="Search name, #, chapter, alumni…">
+      <small class="text-muted" id="pipelineCount">—</small>
+    </div>
+  </div>
+  <div class="card-body">
+    <!-- Pipeline KPIs -->
+<div class="kpi-grid mb-3">
+  <div class="kpi kpi-primary kpi-col-6" style="cursor:default">
+    <div class="k-title">Graduated (Collegiate)</div>
+    <div id="pipelineKpiGraduated" class="k-num">—</div>
+  </div>
+  <div class="kpi kpi-secondary kpi-col-3" style="cursor:default">
+    <div class="k-title">Transitioned to Alumni</div>
+    <div id="pipelineKpiTransitioned" class="k-num">—</div>
+  </div>
+  <div class="kpi kpi-tertiary kpi-col-3" style="cursor:default">
+    <div class="k-title">Conversion Rate</div>
+    <div id="pipelineKpiPct" class="k-num">—</div>
+  </div>
+</div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th style="min-width:220px">Name</th>
+            <th>Member #</th>
+           <th style="min-width:180px">Current Chapter</th>
+           <th style="min-width:220px">Advised Alumni Chapter(s)</th>
+           <th style="min-width:120px">Financial Through</th>
+           <th style="min-width:200px">Status</th>
+           <th style="min-width:220px">Transfer to Alumni Chapter</th>
+  </tr>
+</thead>
+        <tbody id="pipelineAllRows">
+          <tr><td colspan="8" class="text-muted">Building tracker…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="small text-muted" id="pipelineNotes"></div>
+  </div>
+</div>
+
+<script>
+/* ---------------- Pipeline Tracker (standalone, non-invasive) ---------------- */
+(async function buildPipelineTracker(){
+  const rowsEl   = document.getElementById('pipelineAllRows');
+  const countEl  = document.getElementById('pipelineCount');
+  const notesEl  = document.getElementById('pipelineNotes');
+  const searchEl = document.getElementById('pipelineSearch');
+
+  function safe(v){ return (v??'')==='' ? '—' : v; }
+  function fullName(r){ return [r.first_name, r.last_name].filter(Boolean).join(' ') || '—'; }
+  function normStatus(s){ return String(s||'').trim().toLowerCase(); }
+  function getAdminKey(){ return localStorage.getItem('adminKey') || ''; }
+
+  // Try multiple endpoint shapes for advised collegiate list on each Alumni chapter
+  async function fetchAdvisedCollegiate(alumniId){
+    const urls = [
+      `/api/chapters/${alumniId}/advised-collegiate`,
+      `/api/chapters/${alumniId}/advised_collegiate`,
+      `/api/chapters/${alumniId}/advised-chapters`,
+      `/api/chapters/${alumniId}/advised`
+    ];
+    for (const u of urls){
+      try{
+        const res = await fetch(u);
+        if(!res.ok) continue;
+        const data = await res.json();
+        // normalize
+        const list = Array.isArray(data) ? data
+                  : Array.isArray(data?.chapters) ? data.chapters
+                  : Array.isArray(data?.data) ? data.data
+                  : [];
+        if (Array.isArray(list)) return list;
+      }catch(_e){}
+    }
+    return [];
+  }
+
+  async function fetchBulkPipelineStatus(member_numbers){
+  if (!Array.isArray(member_numbers) || member_numbers.length===0) return [];
+  try{
+    const res = await fetch('/api/pipeline/status/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ member_numbers })
+    });
+    if (!res.ok) return [];
+    const data = await res.json().catch(()=>({rows:[]}));
+    return Array.isArray(data?.rows) ? data.rows : [];
+  }catch(_e){
+    return [];
+  }
+}
+  // Submit a transfer to the backend. Adjust URL/shape here if your API differs.
+  async function submitTransfer(payload){
+    const key = getAdminKey();
+    if (!key){
+      alert('Admin key required to transfer. Go to Admin and save your key first.');
+      throw new Error('missing-admin-key');
+    }
+    const res = await fetch('/api/pipeline/transfer', { // <—— update if your endpoint differs
+      method: 'POST',
+      headers: {
+        'Content-Type':'application/json',
+        'x-admin-key': key
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok){
+      const t = await res.text().catch(()=> '');
+      throw new Error(t || 'Transfer failed');
+    }
+    return res.json().catch(()=>({ok:true}));
+  }
+
+  try{
+    // 1) Load all chapters
+    const all = await (await fetch('/api/chapters')).json();
+    const collegiate = (all||[]).filter(c => String(c.type||'').toLowerCase()==='collegiate');
+    const alumni     = (all||[]).filter(c => String(c.type||'').toLowerCase()==='alumni');
+
+    // For the alumni chapter picker
+    const alumniList = alumni.map(a => ({
+      id: a.id,
+      name: a.name || a.chapter_name || `Alumni #${a.id}`
+    })).sort((a,b)=> a.name.localeCompare(b.name));
+
+    // 2) Build map: collegiateId -> [alumni chapter names] (from alumni advised lists)
+    const advisedMap = {}; // { collegiateId: [alumniNames] }
+    await Promise.all(
+      alumni.map(async (a)=>{
+        const advised = await fetchAdvisedCollegiate(a.id);
+        advised.forEach(col=>{
+          const cid = col.id || col.chapter_id || col.uuid;
+          if(!cid) return;
+          advisedMap[cid] = advisedMap[cid] || [];
+          const nm = a.name || a.chapter_name || '—';
+          if(!advisedMap[cid].includes(nm)) advisedMap[cid].push(nm);
+        });
+      })
+    );
+
+    // 3) For each collegiate chapter, fetch roster and collect Graduated brothers
+    //    Keep it reasonably parallel
+    const pipelineRows = [];
+    let totalGraduated = 0;
+    let totalTransitioned = 0;
+    await Promise.all(
+      collegiate.map(async (c)=>{
+        try{
+          const roster = await (await fetch(`/api/chapters/${c.id}/roster`)).json();
+          (Array.isArray(roster) ? roster : []).forEach(r=>{
+  if (normStatus(r.status) === 'graduated'){
+    totalGraduated++;
+
+    const transitionedId = r.transitioned_alumni_chapter_id ?? r.transitionedChapterId ?? r.transitioned_alumni_id ?? null;
+    const hasTransitioned = transitionedId != null && String(transitionedId).trim() !== '';
+
+    if (hasTransitioned){
+      totalTransitioned++;
+      // Do NOT include in pipeline table if already transitioned
+      return;
+    }
+
+    pipelineRows.push({
+      name: fullName(r),
+      number: r.member_number || r.id || '—',
+      fromId: c.id,
+      chapter: c.name || c.chapter_name || '—',
+      alumniChapters: (advisedMap[c.id] && advisedMap[c.id].length) ? advisedMap[c.id].join(', ') : '—',
+      finThrough: safe(r.financial_through),
+      status: 'collegiate',
+      toAlumniChapterId: null,
+      member_id: r.id || r.member_id || r.member_number || r['Member #'] || null,
+      from_collegiate_id: c.id
+    });
+  }
+});
+        }catch(_e){}
+      })
+    );
+
+    // 4) Render
+    function render(filtered){
+  rowsEl.innerHTML = '';
+  if(!filtered.length){
+    rowsEl.innerHTML = '<tr><td colspan="7" class="text-muted">No graduated brothers found.</td></tr>';
+    countEl.textContent = '0 bros';
+    return;
+  }
+
+  filtered.sort((a,b)=> (a.chapter||'').localeCompare(b.chapter||'') || (a.name||'').localeCompare(b.name||''));
+
+  filtered.forEach(r=>{
+    const tr = document.createElement('tr');
+
+    // Name
+    const tdName = document.createElement('td');
+    tdName.textContent = r.name;
+
+    // Member #
+    const tdNum = document.createElement('td');
+    tdNum.textContent = r.number;
+
+    // Current Chapter
+    const tdChap = document.createElement('td');
+    tdChap.textContent = r.chapter;
+
+    // Advised Alumni (info)
+    const tdAdvised = document.createElement('td');
+    tdAdvised.textContent = r.alumniChapters;
+
+    // Financial Through
+    const tdFin = document.createElement('td');
+    tdFin.textContent = r.finThrough;
+
+    // ----- Status (own cell) -----
+    const tdStatus = document.createElement('td');
+    const statusSel = document.createElement('select');
+    statusSel.className = 'form-select form-select-sm';
+    [
+      {v:'collegiate',  label:'On Collegiate Roster'},
+      {v:'transferred', label:'Transferred to Alumni'}
+    ].forEach(o=>{
+      const opt = document.createElement('option');
+      opt.value = o.v; opt.textContent = o.label;
+      if (r.status === o.v) opt.selected = true;
+      statusSel.appendChild(opt);
+    });
+    tdStatus.appendChild(statusSel);
+
+    // ----- Transfer (own cell) -----
+    const tdTransfer = document.createElement('td');
+
+    const alumniSel = document.createElement('select');
+    alumniSel.className = 'form-select form-select-sm';
+    alumniSel.style.marginBottom = '0.25rem';
+    alumniSel.disabled = (r.status !== 'transferred');
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Select Alumni Chapter…';
+    alumniSel.appendChild(placeholder);
+
+    (alumniList||[]).forEach(a=>{
+      const opt = document.createElement('option');
+      opt.value = String(a.id);
+      opt.textContent = a.name;
+      if (String(r.toAlumniChapterId||'') === String(a.id)) opt.selected = true;
+      alumniSel.appendChild(opt);
+    });
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn btn-sm btn-primary';
+    saveBtn.textContent = 'Save';
+
+    // wiring
+    statusSel.addEventListener('change', ()=>{
+      r.status = statusSel.value;
+      alumniSel.disabled = (r.status !== 'transferred');
+    });
+    alumniSel.addEventListener('change', ()=>{
+      r.toAlumniChapterId = alumniSel.value || null;
+    });
+
+    saveBtn.addEventListener('click', async ()=>{
+      const key = getAdminKey();
+      if (!key){
+        alert('Admin key required. Go to Admin and save your key first.');
+        return;
+      }
+      if (!r.number || r.number === '—'){
+        alert('Missing member number; cannot transfer.');
+        return;
+      }
+      if (!r.fromId){
+        alert('Missing source (collegiate) chapter id; cannot transfer.');
+        return;
+      }
+      if (r.status === 'transferred' && !r.toAlumniChapterId){
+        alert('Please select an Alumni Chapter before saving a transfer.');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      try{
+        const resp = await fetch('/api/pipeline/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'x-admin-key': key },
+          body: JSON.stringify({
+            member_number: String(r.number),
+            from_collegiate_chapter_id: String(r.fromId),
+            status: r.status,
+            to_alumni_chapter_id: r.status === 'transferred' ? String(r.toAlumniChapterId) : null
+          })
+        });
+        const ok = resp.ok;
+        const msg = await resp.text().catch(()=>'');
+
+        if (!ok) throw new Error(msg || 'transfer failed');
+
+        // Success UX
+if (r.status === 'transferred'){
+  const i1 = currentList.indexOf(r);
+  if (i1 > -1) currentList.splice(i1, 1);
+
+  const i2 = pipelineRows.indexOf(r);
+  if (i2 > -1) pipelineRows.splice(i2, 1);
+
+  setTimeout(()=> render(currentList), 250);
+} else {
+  // ...
+}
+
+        // If transferred, remove from current list and re-render
+        if (r.status === 'transferred'){
+          const idx = filtered.indexOf(r);
+          if (idx > -1) filtered.splice(idx, 1);
+          const globalIdx = pipelineRows.indexOf(r);
+          if (globalIdx > -1) pipelineRows.splice(globalIdx, 1);
+          setTimeout(()=> render(pipelineRows), 250);
+        } else {
+          // stayed on collegiate roster — just restore button after a moment
+          setTimeout(()=>{
+            saveBtn.classList.remove('btn-success'); saveBtn.classList.add('btn-primary');
+            saveBtn.textContent = 'Save'; saveBtn.disabled = false;
+          }, 900);
+        }
+      }catch(e){
+        alert('Transfer failed: ' + (e?.message || e));
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+      }
+    });
+
+    tdTransfer.appendChild(alumniSel);
+    tdTransfer.appendChild(saveBtn);
+
+    // append in the same order as header
+    tr.appendChild(tdName);
+    tr.appendChild(tdNum);
+    tr.appendChild(tdChap);
+    tr.appendChild(tdAdvised);
+    tr.appendChild(tdFin);
+    tr.appendChild(tdStatus);
+    tr.appendChild(tdTransfer);
+
+    rowsEl.appendChild(tr);
+  });
+
+  countEl.textContent = `${filtered.length.toLocaleString()} bros`;
+}
+
+
+    // initial render
+    // Merge pipeline statuses from DB and filter out those already transferred
+const numbers = pipelineRows.map(r => String(r.number)).filter(Boolean);
+const bulkRows = await fetchBulkPipelineStatus(numbers);
+
+// member_number -> {status, to_alumni_chapter_id}
+const statusMap = {};
+(bulkRows||[]).forEach(row=>{
+  statusMap[String(row.member_number)] = row;
+});
+
+// apply DB status to UI rows, and build the list we’ll actually render
+let currentList = [];
+pipelineRows.forEach(r=>{
+  const hit = statusMap[String(r.number)];
+  if (hit){
+    // normalize + prefill
+    r.status = String(hit.status || '').toLowerCase() || 'collegiate';
+    r.toAlumniChapterId = hit.to_alumni_chapter_id ?? null;
+  }
+  // only show non-transferred records in the tracker
+  if (r.status !== 'transferred') currentList.push(r);
+});
+
+// initial render
+render(currentList);
+
+// --- KPIs
+const pct = (totalGraduated > 0) ? (totalTransitioned / totalGraduated) * 100 : 0;
+document.getElementById('pipelineKpiGraduated').textContent    = totalGraduated.toLocaleString();
+document.getElementById('pipelineKpiTransitioned').textContent = totalTransitioned.toLocaleString();
+document.getElementById('pipelineKpiPct').textContent          = `${pct.toFixed(1)}%`;
+
+// Count shown in table = still pending (graduated but not transitioned)
+countEl.textContent = `${currentList.length.toLocaleString()} bros`;
+
+// update search to use the filtered list
+searchEl.addEventListener('input', ()=>{
+  const q = searchEl.value.trim().toLowerCase();
+  if(!q) return render(currentList);
+  const filtered = currentList.filter(r=>
+    (r.name||'').toLowerCase().includes(q) ||
+    String(r.number||'').toLowerCase().includes(q) ||
+    (r.chapter||'').toLowerCase().includes(q) ||
+    (r.alumniChapters||'').toLowerCase().includes(q) ||
+    String(r.finThrough||'').toLowerCase().includes(q)
+  );
+  render(filtered);
+});
+
+    // 5) Client-side search
+    searchEl.addEventListener('input', ()=>{
+      const q = searchEl.value.trim().toLowerCase();
+      if(!q) return render(pipelineRows);
+      const filtered = pipelineRows.filter(r=>
+        (r.name||'').toLowerCase().includes(q) ||
+        String(r.number||'').toLowerCase().includes(q) ||
+        (r.chapter||'').toLowerCase().includes(q) ||
+        (r.alumniChapters||'').toLowerCase().includes(q) ||
+        String(r.finThrough||'').toLowerCase().includes(q)
+      );
+      render(filtered);
+    });
+
+    // Footnote
+    notesEl.innerHTML = `<span class="me-2">Includes all brothers marked <b>Graduated</b> on collegiate rosters.</span>
+                         <span>Use the status toggle + alumni selector to transfer a brother to an Alumni chapter.</span>`;
+  }catch(err){
+    rowsEl.innerHTML = `<tr><td colspan="8" class="text-danger">Failed to build tracker.</td></tr>`;
+    countEl.textContent = '—';
+    console.error('Pipeline tracker error', err);
+  }
+})();
+</script>
+<!-- ================= END PIPELINE OPPORTUNITY TRACKER ================= -->
+
+<!-- ===== Statewide Financial Impact (PIA) ===== -->
+<div class="card mt-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="section-title">Financial Impact (PIA) — Statewide</span>
+    <small class="text-muted" id="statePiaMoneyAsOf">as of —</small>
+  </div>
+  <div class="card-body">
+    <div class="kpi-grid">
+      <div class="kpi kpi-primary kpi-col-6" style="cursor:default">
+        <div class="k-title">Scholarships Disbursed</div>
+        <div id="state-pia-scholarships" class="k-num">—</div>
+      </div>
+      <div class="kpi kpi-tertiary kpi-col-6" style="cursor:default">
+        <div class="k-title">Black-Owned Spend</div>
+        <div id="state-pia-blackspend" class="k-num">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ===== /Statewide Financial Impact (PIA) ===== -->
+
+  <!-- PIA TOP 5 SECTION -->
+  <div class="card mt-3">
+    <div class="card-header">
+      <span class="section-title">PIA • Top 5 Chapters by Service Hours</span>
+    </div>
+    <div class="card-body">
+      <div class="pia-grid">
+        <!-- Total Hours -->
+        <div class="pia-col-6">
+          <div class="mini-h">Total Hours — Collegiate</div>
+          <table class="table table-sm"><tbody id="piaTotalCollegiate"></tbody></table>
+        </div>
+        <div class="pia-col-6">
+          <div class="mini-h">Total Hours — Alumni</div>
+          <table class="table table-sm"><tbody id="piaTotalAlumni"></tbody></table>
+        </div>
+        <!-- BBB -->
+        <div class="pia-col-6">
+          <div class="mini-h">BBB — Collegiate</div>
+          <table class="table table-sm"><tbody id="piaBBBCollegiate"></tbody></table>
+        </div>
+        <div class="pia-col-6">
+          <div class="mini-h">BBB — Alumni</div>
+          <table class="table table-sm"><tbody id="piaBBBAlumni"></tbody></table>
+        </div>
+        <!-- Social Action -->
+        <div class="pia-col-6">
+          <div class="mini-h">Social Action — Collegiate</div>
+          <table class="table table-sm"><tbody id="piaSocialCollegiate"></tbody></table>
+        </div>
+        <div class="pia-col-6">
+          <div class="mini-h">Social Action — Alumni</div>
+          <table class="table table-sm"><tbody id="piaSocialAlumni"></tbody></table>
+        </div>
+        <!-- Education -->
+        <div class="pia-col-6">
+          <div class="mini-h">Education — Collegiate</div>
+          <table class="table table-sm"><tbody id="piaEduCollegiate"></tbody></table>
+        </div>
+        <div class="pia-col-6">
+          <div class="mini-h">Education — Alumni</div>
+          <table class="table table-sm"><tbody id="piaEduAlumni"></tbody></table>
+        </div>
+        <!-- Sigma Beta Club -->
+        <div class="pia-col-6">
+          <div class="mini-h">Sigma Beta Club — Collegiate</div>
+          <table class="table table-sm"><tbody id="piaSBCCollegiate"></tbody></table>
+        </div>
+        <div class="pia-col-6">
+          <div class="mini-h">Sigma Beta Club — Alumni</div>
+          <table class="table table-sm"><tbody id="piaSBCAlumni"></tbody></table>
+        </div>
+      </div>
+      <div class="small text-muted">Top lists are based on the latest uploaded PIA data.</div>
+    </div>
+  </div>
+
 </div>
 
 <script>
 let map, markers=[], allChapters=[], filter = null;
-const BLUE_ICON_URL = 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png'; // blue pins
 
 function setChipSelected(id, on){ document.getElementById(id).classList.toggle('chip-selected', on); }
 function clearChipSelections(){ ['k-total','k-collegiate','k-alumni','k-inactive'].forEach(id=>setChipSelected(id,false)); }
-
 function passesFilter(c){
   if (!filter) return true;
   const status = (c.status||'Active').toLowerCase();
@@ -141,6 +738,33 @@ function passesFilter(c){
   return true;
 }
 
+// --- Level icons for Top 5 Membership (unchanged baseline icons) ---
+const LEVELS = {
+  alumni: [
+    { name: "Founders Level", min: 201, icon: "/img/levels/founders.png" },
+    { name: "Platinum Level", min: 151, icon: "/img/levels/platinum.png" },
+    { name: "Sapphire Level", min: 101, icon: "/img/levels/sapphire.png" },
+    { name: "Diamond Level",  min: 76,  icon: "/img/levels/diamond.png" },
+    { name: "Gold Level",     min: 56,  icon: "/img/levels/gold.png" },
+    { name: "Silver Level",   min: 36,  icon: "/img/levels/silver.png" },
+    { name: "Bronze Level",   min: 15,  icon: "/img/levels/bronze.png" }
+  ],
+  collegiate: [
+    { name: "Founders Level", min: 76, icon: "/img/levels/founders.png" },
+    { name: "Platinum Level", min: 66, icon: "/img/levels/platinum.png" },
+    { name: "Sapphire Level", min: 51, icon: "/img/levels/sapphire.png" },
+    { name: "Diamond Level",  min: 36, icon: "/img/levels/diamond.png" },
+    { name: "Gold Level",     min: 21, icon: "/img/levels/gold.png" },
+    { name: "Silver Level",   min: 11, icon: "/img/levels/silver.png" },
+    { name: "Bronze Level",   min: 5,  icon: "/img/levels/bronze.png" }
+  ]
+};
+function levelFor(members, typeKey){
+  const scale = typeKey==='alumni' ? LEVELS.alumni : LEVELS.collegiate;
+  for (const s of scale){ if (members >= s.min) return s; }
+  return { name:"Unranked", icon:"/img/levels/platinum.png" };
+}
+
 function renderList(chapters){
   const ul = document.getElementById('chapterList');
   ul.innerHTML = '';
@@ -150,30 +774,73 @@ function renderList(chapters){
     a.className = 'chapter-link';
     const isActive = (c.status||'Active').toLowerCase()==='active';
     const type = (c.type||'').toLowerCase();
-    const dotClass = isActive ? (type==='collegiate' ? 'dot-collegiate' : 'dot-alumni') : 'dot-inactive';
+    const dotClass = !isActive ? 'dot-inactive' : (type==='collegiate' ? 'dot-collegiate' : 'dot-alumni');
     a.innerHTML = `<span class="badge-dot ${dotClass}"></span>${c.name}${c.city? ' <small class="text-muted">— '+c.city+'</small>':''}`;
     ul.appendChild(a);
   });
 }
 
+function cssVar(name, fallback){ 
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+const ICONS = {
+  collegiate: () => ({
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: 7,
+    fillColor: cssVar('--light-blue', '#60A5FA'),
+    fillOpacity: 1,
+    strokeColor: cssVar('--royal-700', '#1D4ED8'),
+    strokeOpacity: 1,
+    strokeWeight: 1.5
+  }),
+  alumni: () => ({
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: 7,
+    fillColor: cssVar('--royal', '#0b2b7e'),
+    fillOpacity: 1,
+    strokeColor: cssVar('--royal-700', '#1D4ED8'),
+    strokeOpacity: 1,
+    strokeWeight: 1.5
+  }),
+  inactive: () => ({
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: 6,
+    fillColor: '#6B7280',
+    fillOpacity: 0.9,
+    strokeColor: '#374151',
+    strokeOpacity: 1,
+    strokeWeight: 1
+  })
+};
+
 function renderMap(chapters){
-  // clear old markers
-  markers.forEach(m=>m.setMap(null)); markers = [];
+   markers.forEach(m=>m.setMap(null)); markers = [];
   const bounds = new google.maps.LatLngBounds(); let any=false;
 
   chapters
     .filter(c=>c.latitude && c.longitude)
     .filter(passesFilter)
     .forEach(c=>{
+      const isActive = (c.status||'Active').toLowerCase()==='active';
+      const type = (c.type||'').toLowerCase();
+
+      const icon = !isActive
+        ? ICONS.inactive()
+        : (type==='collegiate' ? ICONS.collegiate() : ICONS.alumni());
+
       const m = new google.maps.Marker({
         map,
         position:{ lat:c.latitude, lng:c.longitude },
         title:c.name,
-        icon: { url: BLUE_ICON_URL }
+        icon
       });
+
       const html = `<div style="min-width:200px"><strong>${c.name}</strong><br/>${c.city? c.city+'<br/>':''}<a href="/chapter/${c.id}">Open chapter page</a></div>`;
       const inf = new google.maps.InfoWindow({ content: html });
       m.addListener('click', ()=> inf.open({ map, anchor: m }));
+
       markers.push(m);
       bounds.extend(m.getPosition()); any=true;
     });
@@ -194,32 +861,196 @@ function applyFilter(newFilter){
 async function loadTotals(){
   const t = await (await fetch('/api/stats/active-brothers/by-type-latest')).json();
   const fmt = (n)=> (n==null ? '—' : n.toLocaleString());
-  document.getElementById('t-total').textContent = fmt(t.total);
-  document.getElementById('t-alumni').textContent = fmt(t.alumni);
-  document.getElementById('t-collegiate').textContent = fmt(t.collegiate);
-  document.getElementById('t-date').textContent = t.year ? ('as of ' + t.year) : 'as of —';
+  document.getElementById('kpi-total').textContent = fmt(t.total);
+  document.getElementById('kpi-alumni').textContent = fmt(t.alumni);
+  document.getElementById('kpi-collegiate').textContent = fmt(t.collegiate);
+
+  const up = await (await fetch('/api/stats/yearly-last-upload')).json();
+  if (up?.last_upload_at){
+    const d = new Date(up.last_upload_at);
+    const mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0'), yy=d.getFullYear();
+    document.getElementById('kpi-asof').textContent = `as of ${mm}/${dd}/${yy}`;
+  }
 }
 
-function renderTopMembership(targetId, list){
+function renderTopMembership(targetId, list, typeKey){
   const el = document.getElementById(targetId);
   el.innerHTML = '';
   list.forEach((r, i)=>{
+    const lev = levelFor(r.members||0, typeKey);
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td class="text-muted">${i+1}.</td>
-      <td><a href="/chapter/${r.id}">${r.name}</a></td>
-      <td class="text-end">${(r.members??0).toLocaleString()}</td>`;
+    tr.innerHTML = `
+      <td class="text-muted">${i+1}.</td>
+      <td>
+        <img class="level-icon" src="${lev.icon}" alt="">
+        <a href="/chapter/${r.id}">${r.name}</a>
+        <div class="small text-muted">${lev.name}</div>
+      </td>
+      <td class="text-end fw-semibold">${(r.members??0).toLocaleString()}</td>`;
     el.appendChild(tr);
   });
 }
 
-async function loadTop5(){
+async function loadTop5Membership(){
   const [mCol, mAlu] = await Promise.all([
     fetch('/api/stats/top-membership?type=collegiate').then(r=>r.json()),
     fetch('/api/stats/top-membership?type=alumni').then(r=>r.json())
   ]);
   document.getElementById('tmYear').textContent = mCol.year ? `as of ${mCol.year}` : '—';
-  renderTopMembership('tmCollegiate', mCol.rows || []);
-  renderTopMembership('tmAlumni', mAlu.rows || []);
+  renderTopMembership('tmCollegiate', mCol.rows || [], 'collegiate');
+  renderTopMembership('tmAlumni',     mAlu.rows || [], 'alumni');
+}
+
+// Parse money that might come as number OR "$4,000.00" string
+function parseMoney(v){
+  if (v == null) return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const cleaned = s.replace(/[^0-9.\-]/g, ''); // remove $, commas, spaces
+  const num = parseFloat(cleaned);
+  return isFinite(num) ? num : null;
+}
+
+function fmtMoney(v){
+  const n = parseMoney(v);
+  return n == null
+    ? '—'
+    : n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+}
+
+async function loadStatePiaMoneyTotals(){
+  try{
+    const resp = await fetch('/api/stats/pia/financial-totals');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    // tolerate different key names from backend
+    const scholarships =
+      data?.scholarship_total ??
+      data?.scholarships_total ??
+      data?.scholarship_funds_disbursed ??
+      data?.total_scholarships;
+
+    const blackSpend =
+      data?.black_spend_total ??
+      data?.black_owned_spend_total ??
+      data?.black_spend ??
+      data?.total_black_spend;
+
+    // as_of fallback to yearly-last-upload if missing
+    let asOf = data?.as_of;
+    if (!asOf){
+      try{
+        const up = await (await fetch('/api/stats/yearly-last-upload')).json();
+        asOf = up?.last_upload_at || null;
+      }catch(_e){}
+    }
+
+    document.getElementById('state-pia-scholarships').textContent = fmtMoney(scholarships);
+    document.getElementById('state-pia-blackspend').textContent  = fmtMoney(blackSpend);
+    document.getElementById('statePiaMoneyAsOf').textContent = (() => {
+      if (!asOf) return 'as of —';
+      const d = new Date(asOf);
+      return isNaN(d) ? 'as of —' : `as of ${d.toLocaleDateString()}`;
+    })();
+
+    // Optional: console insight if something parsed oddly
+    if (parseMoney(scholarships) == null || parseMoney(blackSpend) == null){
+      console.warn('PIA financial totals contained non-numeric values:', { scholarships, blackSpend, data });
+    }
+  }catch(err){
+    console.error('loadStatePiaMoneyTotals failed:', err);
+    document.getElementById('state-pia-scholarships').textContent = '—';
+    document.getElementById('state-pia-blackspend').textContent  = '—';
+    document.getElementById('statePiaMoneyAsOf').textContent     = 'as of —';
+  }
+}
+
+/* ---------- KPI: total growth line ---------- */
+async function loadTotalGrowth(){
+  const g = await (await fetch('/api/stats/active-brothers/growth-total')).json();
+  if (!g || !g.year) {
+    document.getElementById('kpi-growth').textContent = '—';
+    return;
+  }
+  const sign = g.delta > 0 ? '+' : '';
+  const pct = (g.pct || 0).toFixed(1);
+  document.getElementById('kpi-growth').textContent =
+    `${sign}${g.delta.toLocaleString()} vs ${g.prev_year} (${sign}${pct}%)`;
+}
+
+/* ---------- Top 5 by members added (YoY) ---------- */
+function renderTopGrowth(tbodyId, rows){
+  const el = document.getElementById(tbodyId);
+  el.innerHTML = '';
+  (rows||[]).forEach((r,i)=>{
+    const sign = r.delta > 0 ? '+' : '';
+    const pct = (r.pct || 0).toFixed(1);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="text-muted">${i+1}.</td>
+      <td><a href="/chapter/${r.id}">${r.name}</a></td>
+      <td class="text-end fw-semibold">${sign}${(r.delta||0).toLocaleString()}</td>
+      <td class="text-end text-muted small">${sign}${pct}%</td>`;
+    el.appendChild(tr);
+  });
+}
+
+async function loadTop5Growth(){
+  const [cg, ag] = await Promise.all([
+    fetch('/api/stats/top-growth?type=collegiate').then(r=>r.json()),
+    fetch('/api/stats/top-growth?type=alumni').then(r=>r.json())
+  ]);
+  document.getElementById('tgYear').textContent =
+    (cg.year && cg.prev_year) ? `vs ${cg.prev_year} → ${cg.year}` : '—';
+  renderTopGrowth('tgCollegiate', cg.rows);
+  renderTopGrowth('tgAlumni',     ag.rows);
+}
+
+/* ---------- PIA Top 5 via backend aggregation ---------- */
+function renderPiaTable(tbodyId, rows){
+  const el=document.getElementById(tbodyId); el.innerHTML='';
+  (rows||[]).forEach((r,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `
+      <td class="text-muted">${i+1}.</td>
+      <td><a href="/chapter/${r.id}">${r.name}</a></td>
+      <td class="text-end fw-semibold">${(r.value??0).toLocaleString(undefined,{maximumFractionDigits:2})}</td>`;
+    el.appendChild(tr);
+  });
+}
+
+async function fetchPiaTop(program, type){
+  const res = await fetch(`/api/stats/pia/top?program=${encodeURIComponent(program)}&type=${encodeURIComponent(type)}&limit=5`);
+  return res.json();
+}
+
+async function loadPiaTop(){
+  const [
+    totalCol, totalAlu,
+    bbbCol, bbbAlu,
+    socialCol, socialAlu,
+    eduCol, eduAlu,
+    sbcCol, sbcAlu
+  ] = await Promise.all([
+    fetchPiaTop('total','collegiate'), fetchPiaTop('total','alumni'),
+    fetchPiaTop('bbb','collegiate'),   fetchPiaTop('bbb','alumni'),
+    fetchPiaTop('social','collegiate'),fetchPiaTop('social','alumni'),
+    fetchPiaTop('education','collegiate'), fetchPiaTop('education','alumni'),
+    fetchPiaTop('sbc','collegiate'),   fetchPiaTop('sbc','alumni'),
+  ]);
+
+  renderPiaTable('piaTotalCollegiate',  totalCol.rows);
+  renderPiaTable('piaTotalAlumni',      totalAlu.rows);
+  renderPiaTable('piaBBBCollegiate',    bbbCol.rows);
+  renderPiaTable('piaBBBAlumni',        bbbAlu.rows);
+  renderPiaTable('piaSocialCollegiate', socialCol.rows);
+  renderPiaTable('piaSocialAlumni',     socialAlu.rows);
+  renderPiaTable('piaEduCollegiate',    eduCol.rows);
+  renderPiaTable('piaEduAlumni',        eduAlu.rows);
+  renderPiaTable('piaSBCCollegiate',    sbcCol.rows);
+  renderPiaTable('piaSBCAlumni',        sbcAlu.rows);
 }
 
 function applySearch(){
@@ -235,37 +1066,37 @@ async function init(){
   const res = await fetch('/api/chapters');
   allChapters = await res.json();
 
-  // KPI counts
   const active = allChapters.filter(c => (c.status||'Active').toLowerCase()==='active');
   const inactive = allChapters.length - active.length;
   const activeCollegiate = active.filter(c => (c.type||'').toLowerCase()==='collegiate').length;
   const activeAlumni = active.filter(c => (c.type||'').toLowerCase()==='alumni').length;
+
   document.getElementById('k-total').textContent = `Active: ${active.length}`;
   document.getElementById('k-collegiate').textContent = `Collegiate: ${activeCollegiate}`;
   document.getElementById('k-alumni').textContent = `Alumni: ${activeAlumni}`;
   document.getElementById('k-inactive').textContent = `Inactive: ${inactive}`;
 
-  // Filters
   document.getElementById('k-total').onclick      = ()=>applyFilter('active');
   document.getElementById('k-collegiate').onclick = ()=>applyFilter('collegiate');
   document.getElementById('k-alumni').onclick     = ()=>applyFilter('alumni');
   document.getElementById('k-inactive').onclick   = ()=>applyFilter('inactive');
 
-  // Search
   document.getElementById('chapterSearch').addEventListener('input', applySearch);
 
-  // Map + list
   map = new google.maps.Map(document.getElementById('map'), { zoom:7, center:{lat:35.5,lng:-79}, mapTypeControl:false });
   renderList(allChapters);
   renderMap(allChapters);
 
-  // Totals + Top5
   await loadTotals();
-  await loadTop5();
+  await loadTop5Membership();
+  await loadPiaTop();
+  await loadTotalGrowth();
+  await loadTop5Growth();
+  await loadStatePiaMoneyTotals();
 }
 window.init = init;
 </script>
 
-<!-- Replace YOUR_API_KEY -->
+<!-- Replace =KEY with your Google Maps key -->
 <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBnFyHYTnW1fDGlFZWaf1HFsc1Zjui3U7U&callback=init"></script>
 </body></html>

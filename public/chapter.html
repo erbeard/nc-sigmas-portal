@@ -1,245 +1,1472 @@
 <!doctype html><html lang="en"><head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Chapter • NC Sigma Portal</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="/styles/site.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;900&display=swap" rel="stylesheet">
 <style>
+  :root{ --royal:#0b2b7e; --royal2:#0d3aa8; --sky:#3b82f6; --sky2:#60a5fa; }
+
+  /* ------- KPI band (big tiles) ------- */
+  .band-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:1rem}
+  .band{position:relative; color:#fff; border-radius:18px; padding:1.25rem 1.5rem; overflow:hidden}
+  .band-primary{background:linear-gradient(135deg,var(--royal) 0%, var(--royal2) 100%)}
+  .band-tertiary{background:linear-gradient(135deg,var(--sky) 0%, var(--sky2) 100%)}
+  .band-neutral{background:linear-gradient(135deg, #4b5563 0%, #6b7280 100%)}
+  .band:after{content:"";position:absolute;right:-30px;bottom:-30px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.08)}
+  .band:before{content:"";position:absolute;right:120px;bottom:-60px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.06)}
+  .band-col{grid-column:span 4}
+  @media (max-width:992px){ .band-col{grid-column:span 12} }
+
+  .band .title{font-weight:700;opacity:.95}
+  .band .big{font-weight:800; font-size:clamp(34px,7vw,60px); line-height:1}
+  .band .delta{margin-left:.5rem;font-weight:700}
+  .delta-positive{color:#86efac}
+  .delta-negative{color:#fecaca}
+  .delta-zero{color:#d1d5db}
+
+  /* Chapter title */
+  .chapter-title{
+    font-family:'Montserrat',system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif;
+    font-weight:900; font-size:clamp(28px,3.2vw,42px); letter-spacing:.2px; margin-bottom:.25rem;
+  }
+
+  /* Level mini badge */
+  .level-pill{display:inline-flex;align-items:center;gap:.5rem;border-radius:12px;padding:.5rem .75rem;font-weight:700}
+  .pill-founders{background:#111827;color:#fff}
+  .pill-platinum{background:#eef0f3;color:#111827}
+  .pill-sapphire{background:#dbeafe;color:#0b2b7e}
+  .pill-diamond{background:#e0f2fe;color:#0b2b7e}
+  .pill-gold{background:#fff6cc;color:#7c5a00}
+  .pill-silver{background:#f3f4f6;color:#374151}
+  .pill-bronze{background:#fff1e6;color:#7a4b00}
+  .pill-below{background:#dc2626;color:#fff}
+  .level-pill img{width:22px;height:22px}
+
+  /* section structure */
+  .section-title{font-weight:700;margin:.25rem 0 .5rem 0}
   .chapter-crest{height:72px;width:auto;border-radius:8px;object-fit:contain;background:#fff}
-  .president-img{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#e5e7eb}
-  .level-badge{display:inline-block;padding:.35rem .6rem;border-radius:.5rem;font-weight:600}
-  .level-founders{background:#111827;color:#fff}
-  .level-platinum{background:#e5e7eb}
-  .level-sapphire{background:#dbeafe}
-  .level-diamond{background:#fef3c7}
-  .level-gold{background:#fde68a}
-  .level-silver{background:#f3f4f6}
-  .level-bronze{background:#fef2f2}
-  .delta-positive{color:#16a34a; font-weight: 600;} /* green */
-  .delta-negative{color:#dc2626; font-weight: 600;} /* red */
-  .delta-zero{color:#6b7280; font-weight: 600;}     /* gray */
+  .person-img{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#e5e7eb}
+
+  /* PIA tiles */
+  .kpi-grid{display:grid;grid-template-columns:repeat(15,1fr);gap:.75rem}
+  .kpi{border-radius:14px;padding:1rem 1.1rem;color:#fff;position:relative;overflow:hidden;cursor:pointer;transition:box-shadow .15s ease, transform .15s ease}
+  .kpi-royal{background:linear-gradient(135deg, var(--royal) 0%, var(--royal2) 100%)}
+  .kpi-tertiary{background:linear-gradient(135deg, var(--sky) 0%, var(--sky2) 100%)}
+  .kpi-neutral{background:linear-gradient(135deg, #4b5563 0%, #6b7280 100%)}
+  .kpi:after{content:"";position:absolute;right:-30px;bottom:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08)}
+  .kpi:before{content:"";position:absolute;right:40px;bottom:-50px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.06)}
+  .kpi .k-title{font-weight:700;opacity:.95}
+  .kpi .k-num{font-weight:800;line-height:1;font-size:clamp(24px,5.6vw,46px)}
+  .kpi-col-5{grid-column:span 5}
+  .kpi-col-2{grid-column:span 2}
+  .kpi.active { box-shadow: 0 0 0 3px rgba(0,0,0,.08) inset; transform: translateY(-1px); }
+  @media (max-width:992px){ .kpi-col-5{grid-column:span 15} .kpi-col-2{grid-column:span 7} }
+  @media (max-width:576px){ .kpi-col-2{grid-column:span 15} }
+
+  /* Roster */
+  .table-sm td,.table-sm th{padding:.4rem .5rem}
+  .badge-status{font-size:.7rem}
+  .cursor-pointer{cursor:pointer}
+
+  /* Colored select based on status (border + light bg) */
+  .status-select{min-width:140px}
+  .status-active{background:#e8f5ee; border-color:#16a34a}
+  .status-graduated{background:#fff7ed; border-color:#d97706}
+  .status-inactive{background:#f3f4f6; border-color:#6b7280}
+  .status-suspended{background:#fee2e2; border-color:#ef4444}
+  .status-alumni{background:#e0f2fe; border-color:#0284c7}
+
+  .badge-icon{ height:100px; width:auto; margin-right:10px; vertical-align:middle }
+  .social-links a{ display:inline-flex; align-items:center; gap:.4rem; margin-right:.6rem; }
+  .social-links svg{ width:18px; height:18px; }
+
+  /* Advisors */
+  .advisor-card{border:1px solid #e5e7eb;border-radius:12px;padding:.75rem}
+  .advisor-name{font-weight:700}
+
+  /* Advised chapters grid */
+  .advised-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:.5rem}
+  .advised-item{grid-column:span 6;display:flex;align-items:center;gap:.5rem;border:1px solid #e5e7eb;border-radius:10px;padding:.5rem .6rem;background:#fff}
+  .advised-crest{width:72px;height:72px;object-fit:contain;border-radius:6px;background:#fff}
+  .advised-name{font-weight:700;line-height:1.1}
+  .advised-university{font-size:.85rem;color:#6b7280;line-height:1.1}
+  @media (max-width:576px){ .advised-item{grid-column:span 12} }
+
+  /* ---------- MIP badges (ADDED) ---------- */
+  .badge-mip{font-size:.75rem}
+  .mip-ok{background:#d1fae5;color:#065f46;border:1px solid #10b981}
+  .mip-warning{background:#fff7ed;color:#7c2d12;border:1px solid #f59e0b}
+  .mip-expired{background:#fee2e2;color:#7f1d1d;border:1px solid #ef4444}
+  .mip-unknown{background:#e5e7eb;color:#374151;border:1px solid #9ca3af}
 </style>
 </head><body class="bg-light">
 <nav class="navbar navbar-dark">
   <div class="container d-flex align-items-center justify-content-between">
-    <a class="navbar-brand d-flex align-items-center brand" href="/chapters.html">
+    <a class="navbar-brand d-flex align-items-center brand" href="/">
       <img src="/img/nc-crest.png" alt="NC Crest" onerror="this.style.display='none'">
       <span>NC Sigma Portal</span>
     </a>
-    <div class="navbar-nav">
-      <a class="nav-link" href="/documents.html">Documents</a>
-      <a class="nav-link" href="/media.html">Media</a>
-      <a class="nav-link" href="/chapters.html">Chapters</a>
-      <a class="nav-link" href="/calendar">Calendar</a>
-      <a class="nav-link" href="/admin">Admin</a>
-    </div>
+
+    <ul class="navbar-nav flex-row align-items-center gap-3">
+      <li class="nav-item"><a class="nav-link" href="/resources.html">Resources</a></li>
+      <li class="nav-item"><a class="nav-link" href="/chapters.html">Chapters</a></li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="/conferences/2025.html" id="confMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+          Conferences
+        </a>
+        <ul class="dropdown-menu" aria-labelledby="confMenu">
+          <li><a class="dropdown-item" href="/conferences/2025.html">2025 State Conference</a></li>
+          <li><a class="dropdown-item" href="/conferences/2026.html">2026 Regional Conference</a></li>
+        </ul>
+      </li>
+      <li class="nav-item"><a class="nav-link" href="/calendar">Calendar</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+    </ul>
   </div>
 </nav>
 
 <div class="container py-4">
   <div id="loading" class="text-muted">Loading…</div>
   <div id="content" style="display:none;">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-2">
       <div class="d-flex align-items-center gap-3">
         <img id="crest" class="chapter-crest" src="" alt="Chapter crest" onerror="this.style.display='none'">
         <div>
-          <h3 id="title" class="mb-1"></h3>
+          <h3 id="title" class="chapter-title"></h3>
           <div class="small text-muted" id="subtitle"></div>
-        </div>
-      </div>
-
-      <div class="d-flex align-items-stretch gap-3 flex-wrap">
-        <div class="card text-center" style="min-width:260px;">
-          <div class="card-body">
-            <div class="h6 text-muted mb-1">Total Brothers</div>
-            <div class="d-flex align-items-baseline justify-content-center gap-2">
-              <div id="latestActive" class="display-6 fw-bold mb-0">—</div>
-              <div id="latestDelta" class="mb-0 small"> </div>
-            </div>
-            <div class="small text-muted" id="asof">as of —</div>
-          </div>
-        </div>
-
-        <div class="card" style="min-width:260px;">
-          <div class="card-body">
-            <div class="h6 text-muted mb-1">Current Level</div>
-            <div id="levelBadge" class="level-badge">—</div>
-            <div class="small text-muted mt-1" id="toNext">—</div>
-          </div>
-        </div>
-
-        <div class="card" style="min-width:320px;">
-          <div class="card-body d-flex align-items-center gap-3">
-            <img id="presidentPhoto" class="president-img" src="/img/avatar-placeholder.png" alt="President headshot"
-                 onerror="this.src='/img/avatar-placeholder.png'">
-            <div>
-              <div class="h6 mb-1">Chapter President</div>
-              <div id="presidentName">—</div>
-              <div><a id="presidentEmail" href="#" target="_blank"></a></div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
 
-    <div class="row g-3 mt-3">
+    <!-- KPI band 3-up -->
+    <div class="band-grid mb-3">
+      <div class="band band-primary band-col">
+        <div class="title">Total Brothers</div>
+        <div class="d-flex align-items-end gap-2">
+          <div id="latestActive" class="big">—</div>
+          <div id="latestDelta" class="delta">(±0)</div>
+        </div>
+        <div class="small mt-1" id="asof">as of —</div>
+      </div>
+
+      <div class="band band-tertiary band-col">
+        <div class="title mb-2">Current Level</div>
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+          <div id="levelPill" class="level-pill pill-bronze">
+            <img id="levelIcon" src="/img/levels/bronze.png" alt="Level">
+            <span id="levelName">—</span>
+          </div>
+          <div id="toNext" class="fw-semibold">—</div>
+        </div>
+      </div>
+
+      <!-- Campus band: hidden for Alumni -->
+      <div class="band band-neutral band-col" id="campusBand">
+        <div class="title">Total Brothers on Campus</div>
+        <div class="d-flex align-items-end gap-2">
+          <div id="campusTotal" class="big">—</div>
+        </div>
+        <div class="small mt-1 text-white-50">Sum of Active in Roster</div>
+      </div>
+    </div>
+
+    <!-- Info + chart -->
+    <div class="row g-3">
       <div class="col-md-5">
         <div class="card"><div class="card-body">
+          <div class="section-title">Chapter Information</div>
           <dl class="row mb-0">
             <dt class="col-5">Type</dt><dd class="col-7" id="type">—</dd>
             <dt class="col-5">Status</dt><dd class="col-7" id="status">—</dd>
             <dt class="col-5">Location</dt><dd class="col-7" id="city">—</dd>
             <dt class="col-5">University</dt><dd class="col-7" id="university">—</dd>
             <dt class="col-5">Charter Date</dt><dd class="col-7" id="charter">—</dd>
+            <dt class="col-5">Social Media</dt>
+            <dd class="col-7" id="socialLinks"><span class="text-muted">—</span></dd>
+            <dt class="col-5">Badges</dt>
+            <dd class="col-7" id="badges"><span class="text-muted">—</span></dd>
           </dl>
+          <hr>
+
+          <!-- President -->
+          <div class="section-title">Chapter President</div>
+          <div class="d-flex align-items-center gap-3 mb-2">
+            <img id="presidentPhoto" class="person-img" src="/img/avatar-placeholder.png" alt="President headshot"
+                 onerror="this.src='/img/avatar-placeholder.png'">
+            <div>
+              <div id="presidentName">—</div>
+              <div><a id="presidentEmail" href="#" target="_blank"></a></div>
+            </div>
+          </div>
+
+          <!-- Advised Collegiate Chapters (ALUMNI ONLY) -->
+          <div id="advisedBlock" class="mt-2" style="display:none;">
+            <div class="section-title">Advised Collegiate Chapters</div>
+            <div id="advisedList" class="advised-grid"></div>
+          </div>
+
+          <!-- Advisors (COLLEGIATE ONLY) -->
+          <div id="advisorsBlock" class="mt-3" style="display:none;">
+            <div class="section-title">Chapter Advisors</div>
+            <div id="advisorsList" class="d-grid gap-2"></div>
+          </div>
         </div></div>
       </div>
       <div class="col-md-7">
         <div class="card"><div class="card-body">
-          <h6 class="mb-3">Active Members by Year</h6>
+          <div class="section-title">Active Members by Year</div>
           <canvas id="growth" height="140"></canvas>
+          <hr class="my-3">
+          <div class="section-title">MIP Certification (Active Roster)</div>
+          <canvas id="mipPie"
+                  height="120"
+                  style="max-width:360px; display:block; margin:0 auto;"></canvas>
+          <small id="mipPieNote" class="text-muted"></small>
+          <hr class="my-3">
+          <div class="section-title">Collegiate → Alumni Success</div>
+          <canvas id="gradPlacementPie"
+            height="120"
+            style="max-width:360px; display:block; margin:0 auto;"></canvas>
+          <small id="gradPlacementPieNote" class="text-muted"></small>
         </div></div>
       </div>
     </div>
+
+    <!-- ROSTER (Show/Hide + Pipeline + Editable Status) -->
+    <div class="card mt-3" id="rosterCard">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span class="section-title mb-0">Roster</span>
+        <button class="btn btn-sm btn-outline-primary" id="toggleRosterBtn">Hide</button>
+      </div>
+      <div class="card-body" id="rosterBody">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-3">
+            <thead class="table-light">
+              <tr>
+                <th style="min-width:200px">Name</th>
+                <th>Member #</th>
+                <th>Initiated</th>
+                <th>Financial Through</th>
+                <th>MIP</th><!-- ADDED -->
+                <th style="min-width:160px">Status</th>
+              </tr>
+            </thead>
+            <tbody id="rosterRows">
+              <tr><td colspan="6" class="text-muted">Loading roster…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pipeline subsection -->
+        <div id="pipelineSection" style="display:none;">
+          <div class="fw-semibold mb-2">Collegiate → Alumni Pipeline</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr id="pipelineHeaderRow">
+                  <th>Name</th>
+                  <th>Member #</th>
+                  <th>Initiated</th>
+                  <th>Financial Through</th>
+                  <th>Status</th>
+                  <th>Graduation Year</th>
+                  <th>Alumni Chapter</th>
+                </tr>
+              </thead>
+              <tbody id="pipelineRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+
+    <!-- PIA KPI tiles -->
+    <div class="card mt-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="section-title mb-0">Program Implementation Assessment (PIA)</span>
+        <small class="text-muted" id="piaAsOf">as of —</small>
+      </div>
+      <div class="card-body">
+        <div class="kpi-grid">
+          <div class="kpi kpi-royal kpi-col-5" data-program="all" id="tile-total">
+            <div class="k-title">Total PIA Hours</div>
+            <div id="kpi-pia-total" class="k-num">—</div>
+          </div>
+          <div class="kpi kpi-tertiary kpi-col-2" data-program="bbb" id="tile-bbb">
+            <div class="k-title">BBB</div>
+            <div id="kpi-pia-bbb" class="k-num">—</div>
+          </div>
+          <div class="kpi kpi-tertiary kpi-col-2" data-program="social" id="tile-social">
+            <div class="k-title">Social Action</div>
+            <div id="kpi-pia-social" class="k-num">—</div>
+          </div>
+          <div class="kpi kpi-tertiary kpi-col-2" data-program="education" id="tile-education">
+            <div class="k-title">Education</div>
+            <div id="kpi-pia-edu" class="k-num">—</div>
+          </div>
+          <div class="kpi kpi-tertiary kpi-col-2" data-program="sbc" id="tile-sbc">
+            <div class="k-title">Sigma Beta Club</div>
+            <div id="kpi-pia-sbc" class="k-num">—</div>
+          </div>
+          <div class="kpi kpi-neutral kpi-col-2" id="tile-last" style="cursor:default">
+            <div class="k-title">Last PIA</div>
+            <div id="kpi-pia-last" class="k-num" style="font-size:clamp(18px,3.6vw,28px)">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+<div class="card mt-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="section-title mb-0">Financial Impact (PIA)</span>
+    <small class="text-muted" id="piaMoneyAsOf">as of —</small>
   </div>
+  <div class="card-body">
+    <div class="kpi-grid">
+      <div class="kpi kpi-royal kpi-col-5" id="tile-scholarships" style="cursor:default">
+        <div class="k-title">Scholarships Disbursed</div>
+        <div id="kpi-pia-scholarships" class="k-num">—</div>
+      </div>
+      <div class="kpi kpi-tertiary kpi-col-5" id="tile-blackspend" style="cursor:default">
+        <div class="k-title">Black Spend</div>
+        <div id="kpi-pia-blackspend" class="k-num">—</div>
+      </div>
+    </div>
+  </div>
+</div>    
+
+</div>
+    <!-- PIA details (toggle) -->
+    <div class="card mt-3" id="piaDetailsCard" style="display:none;">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span id="piaDetailsTitle" class="section-title mb-0">PIA Details</span>
+        <button class="btn btn-sm btn-outline-secondary" id="piaCloseBtn">Close</button>
+      </div>
+      <div class="card-body" id="piaDetailsContainer"></div>
+    </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// LEVEL DEFINITIONS
+/* --- Level thresholds + icons --- */
 const SCALES = {
   alumni: [
-    { name: "Founders Level", min: 201, cls: "level-founders" },
-    { name: "Platinum Level", min: 151, cls: "level-platinum" },
-    { name: "Sapphire Level", min: 101, cls: "level-sapphire" },
-    { name: "Diamond Level", min: 76,  cls: "level-diamond" },
-    { name: "Gold Level",     min: 56,  cls: "level-gold" },
-    { name: "Silver Level",   min: 36,  cls: "level-silver" },
-    { name: "Bronze Level",   min: 15,  cls: "level-bronze" }
+    { name: "Founders Level", min: 201, pill: "pill-founders", icon: "/img/levels/founders.png" },
+    { name: "Platinum Level", min: 151, pill: "pill-platinum", icon: "/img/levels/platinum.png" },
+    { name: "Sapphire Level", min: 101, pill: "pill-sapphire", icon: "/img/levels/sapphire.png" },
+    { name: "Diamond Level",  min: 76,  pill: "pill-diamond",  icon: "/img/levels/diamond.png" },
+    { name: "Gold Level",     min: 56,  pill: "pill-gold",     icon: "/img/levels/gold.png" },
+    { name: "Silver Level",   min: 36,  pill: "pill-silver",   icon: "/img/levels/silver.png" },
+    { name: "Bronze Level",   min: 15,  pill: "pill-bronze",   icon: "/img/levels/bronze.png" }
   ],
   collegiate: [
-    { name: "Founders Level", min: 76, cls: "level-founders" },
-    { name: "Platinum Level", min: 66, cls: "level-platinum" },
-    { name: "Sapphire Level", min: 51, cls: "level-sapphire" },
-    { name: "Diamond Level",  min: 36, cls: "level-diamond" },
-    { name: "Gold Level",     min: 21, cls: "level-gold" },
-    { name: "Silver Level",   min: 11, cls: "level-silver" },
-    { name: "Bronze Level",   min: 5,  cls: "level-bronze" }
+    { name: "Founders Level", min: 76, pill: "pill-founders", icon: "/img/levels/founders.png" },
+    { name: "Platinum Level", min: 66, pill: "pill-platinum", icon: "/img/levels/platinum.png" },
+    { name: "Sapphire Level", min: 51, pill: "pill-sapphire", icon: "/img/levels/sapphire.png" },
+    { name: "Diamond Level",  min: 36, pill: "pill-diamond",  icon: "/img/levels/diamond.png" },
+    { name: "Gold Level",     min: 21, pill: "pill-gold",     icon: "/img/levels/gold.png" },
+    { name: "Silver Level",   min: 11, pill: "pill-silver",   icon: "/img/levels/silver.png" },
+    { name: "Bronze Level",   min: 5,  pill: "pill-bronze",   icon: "/img/levels/bronze.png" }
   ]
 };
-
 function evaluateLevel(latestActive, chapterType){
-  const scaleKey = (chapterType||"").toLowerCase() === "alumni" ? "alumni" : "collegiate";
-  const scale = SCALES[scaleKey];
-  let current = { name:"Unranked", min:0, cls:"" };
+  const isAlumni = (chapterType||"").toLowerCase()==='alumni';
+  const minBronze = isAlumni ? 15 : 5;
+  const scale = isAlumni ? SCALES.alumni : SCALES.collegiate;
+
+  if (latestActive < minBronze){
+    const needed = Math.max(0, minBronze - latestActive);
+    return {
+      current: { name:"Below Threshold", pill:"pill-below", icon:"/img/levels/bronze.png" },
+      toNextText: `Chapter does not meet minimum threshold to be ranked. ${needed} brother(s) needed for Bronze`
+    };
+  }
+  let current = scale[scale.length-1];
   for (const s of scale){ if (latestActive >= s.min){ current = s; break; } }
-  const idx = scale.findIndex(s => s.name === current.name);
-  const nextHigher = idx > 0 ? scale[idx-1] : null;
-  let toNextText = "—";
-  if (nextHigher){
-    const needed = Math.max(0, nextHigher.min - latestActive);
-    toNextText = needed === 0 ? "At highest level" : `${needed} to reach ${nextHigher.name}`;
-  } else {
-    toNextText = current.name === "Founders Level" ? "At highest level" : "—";
+  const idx = scale.findIndex(s=>s.name===current.name);
+  const next = idx>0 ? scale[idx-1] : null;
+  return {
+    current,
+    toNextText: next ? `${Math.max(0,next.min-latestActive)} to reach ${next.name}` : "At highest level"
+  };
+}
+
+/* helpers */
+function idFromPath(){ const m=location.pathname.match(/\/chapter\/([0-9a-fA-F-]+)/); return m?m[1]:new URLSearchParams(location.search).get('id'); }
+function fmtAsOf(iso){ if(!iso) return 'as of —'; const d=new Date(iso); if(isNaN(d)) return 'as of —'; return `as of ${d.toLocaleDateString()}`; }
+function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); return isNaN(d)?'—':d.toLocaleDateString(); }
+function fullName(r){ return [r.first_name, r.last_name].filter(Boolean).join(' ') || '—'; }
+function safe(v){ return (v??'') === '' ? '—' : v; }
+function getAdminKey(){
+  return localStorage.getItem('adminKey') || '';
+}
+function hexToRgba(hex, a){
+  const h = hex.replace('#','');
+  const bigint = parseInt(h.length===3 ? h.split('').map(c=>c+c).join('') : h, 16);
+  const r=(bigint>>16)&255, g=(bigint>>8)&255, b=bigint&255;
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+function safeHttpUrl(u){
+  if(!u) return '';
+  const s = String(u).trim();
+  if(!/^https?:\/\//i.test(s)) return 'https://' + s;
+  return s;
+}
+function socialIconSVG(kind){
+  if(kind==='instagram'){
+    return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm10 2H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3zm-5 3.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zm0 2a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm5.75-.9a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z"/>
+    </svg>`;
   }
-  return { current, toNextText };
+  // facebook
+  return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M22 12.06C22 6.53 17.52 2 12 2S2 6.53 2 12.06C2 17.08 5.66 21.22 10.44 22v-7.01H7.9v-2.93h2.54V9.41c0-2.5 1.49-3.88 3.77-3.88 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56v1.87h2.78l-.44 2.93h-2.34V22C18.34 21.22 22 17.08 22 12.06z"/>
+  </svg>`;
 }
+function renderSocialLinks(chapter){
+  const el = document.getElementById('socialLinks');
+  if(!el) return;
+  const ig = chapter.instagram_url || chapter.instagram || chapter.instagram_handle;
+  const fb = chapter.facebook_url || chapter.facebook;
+  const links = [];
 
-function idFromPath(){
-  const m = location.pathname.match(/\/chapter\/([0-9a-fA-F-]+)/);
-  if (m) return m[1];
-  return new URLSearchParams(location.search).get('id');
-}
-
-// format to mm/dd/yyyy
-function fmtAsOf(iso){
-  if (!iso) return 'as of —';
-  const d = new Date(iso);
-  if (isNaN(d)) return 'as of —';
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  const yyyy = d.getFullYear();
-  return `as of ${mm}/${dd}/${yyyy}`;
-}
-
-async function main(){
-  const id = idFromPath();
-  if(!id){ document.getElementById('loading').textContent='Missing chapter id'; return; }
-
-  // Chapter
-  const chRes = await fetch('/api/chapters/'+id);
-  if(!chRes.ok){ document.getElementById('loading').textContent='Chapter not found'; return; }
-  const c = await chRes.json();
-
-  document.getElementById('title').textContent = c.name || 'Chapter';
-  document.getElementById('subtitle').textContent = [c.type, c.city].filter(Boolean).join(" • ");
-  document.getElementById('type').textContent = c.type || '—';
-  document.getElementById('status').textContent = c.status || '—';
-  document.getElementById('city').textContent = c.city || '—';
-  document.getElementById('university').textContent = c.university || '—';
-  document.getElementById('charter').textContent = c.charter_date || c.charterDate || '—';
-
-  // Profile (crest/president)
-  const pr = await (await fetch(`/api/chapters/${id}/profile`)).json();
-  if (pr && pr.crest_url){
-    const crest = document.getElementById('crest');
-    crest.src = pr.crest_url; crest.style.display = '';
+  if (ig){
+    const href = safeHttpUrl(ig.includes('instagram.com') ? ig : `https://instagram.com/${ig.replace(/^@/,'')}`);
+    links.push(`<a href="${href}" target="_blank" rel="noopener" class="link-primary text-decoration-none">
+      <span class="text-secondary">${socialIconSVG('instagram')}</span> Instagram
+    </a>`);
   }
-  const photo = document.getElementById('presidentPhoto');
-  if (pr && pr.president_photo_url) photo.src = pr.president_photo_url;
-  document.getElementById('presidentName').textContent = pr?.president_name || '—';
-  const email = pr?.president_email || '';
-  document.getElementById('presidentEmail').textContent = email;
-  document.getElementById('presidentEmail').href = email ? `mailto:${email}` : '#';
+  if (fb){
+    const href = safeHttpUrl(fb.includes('facebook.com') ? fb : `https://facebook.com/${fb}`);
+    links.push(`<a href="${href}" target="_blank" rel="noopener" class="link-primary text-decoration-none">
+      <span class="text-secondary">${socialIconSVG('facebook')}</span> Facebook
+    </a>`);
+  }
 
-  // Yearly history
-  const history = await (await fetch(`/api/chapters/${id}/history-yearly`)).json();
-  const labels = history.map(r => `${r.year}`);
-  const values = history.map(r => r.active_members ?? r.activeMembers);
+  el.classList.add('social-links');
+  el.innerHTML = links.length ? links.join('') : '<span class="text-muted">—</span>';
+}
 
-  // latest + delta vs previous YEAR (not last upload)
-  let latestVal = 0, latestYear = null, delta = 0;
-  if (history.length){
-    const last = history[history.length-1];
-    latestVal = (last.active_members ?? last.activeMembers) || 0;
-    latestYear = last.year;
-    if (history.length >= 2){
-      const prev = history[history.length-2];
-      const prevVal = (prev.active_members ?? prev.activeMembers) || 0;
-      delta = latestVal - prevVal;
-    } else {
-      delta = 0;
+/* --- Globals for cross-section checks --- */
+let LATEST_ACTIVE_TOTAL = 0;    // from history (Total Brothers)
+let LAST_ACTIVE_ON_CAMPUS = 0;  // from roster count (Total Brothers on Campus)
+
+
+/* Is member currently MIP-certified (not expired)? */
+function isMemberCertified(memberNumber){
+  if (!MIP_INDEX) return false;
+  const id = (String(memberNumber||'').match(/\d+/)||[''])[0];
+  if (!id || !MIP_INDEX[id]) return false;
+  const cert = new Date(MIP_INDEX[id]);
+  if (isNaN(cert)) return false;
+  const exp = new Date(cert); exp.setFullYear(exp.getFullYear()+1);
+  const today = new Date();
+  return today <= exp; // valid through expiry day
+}
+
+/* Render the MIP pie chart for Active roster only */
+function renderMipPie(rows){
+  const actives = (rows||[]).filter(r => (r.status||'').toLowerCase()==='active');
+  const activeCount = actives.length;
+  LAST_ACTIVE_ON_CAMPUS = activeCount;
+
+  let certifiedCount = 0;
+  for (const r of actives){
+    if (isMemberCertified(r.member_number)) certifiedCount++;
+  }
+  const notCertified = Math.max(0, activeCount - certifiedCount);
+
+  // ----- build (royal + gray) -----
+  const pieEl = document.getElementById('mipPie');
+  if (pieEl){
+    // read brand color from :root
+    const css   = getComputedStyle(document.documentElement);
+    const royal = (css.getPropertyValue('--royal') || '#0b2b7e').trim();
+    const grey  = '#6b7280';
+
+    if (pieEl._chart) pieEl._chart.destroy();
+
+    pieEl._chart = new Chart(pieEl.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Certified', 'Not Certified'],
+        datasets: [{
+          data: [certifiedCount, notCertified],
+          backgroundColor: [hexToRgba(royal, 0.9), hexToRgba(grey, 0.2)],
+          borderColor: [royal, grey],
+          borderWidth: 1.5
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '62%',            // slightly thinner ring
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 14, boxHeight: 14 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const v = ctx.parsed || 0;
+                const pct = activeCount ? ((v/activeCount)*100).toFixed(1) : '0.0';
+                return `${ctx.label}: ${v} (${pct}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  const note = document.getElementById('mipPieNote');
+  if (note){
+    const pct = activeCount ? ((certifiedCount/activeCount)*100).toFixed(1) : '0.0';
+    note.textContent = `${certifiedCount}/${activeCount} active brothers certified (${pct}%).`;
+  }
+
+  maybeAddBadges(certifiedCount, activeCount);
+}
+
+/* Render Graduated → Alumni placement pie (Placed vs Unplaced) */
+function renderGradPlacementPie(rows){
+  const grads = (rows||[]).filter(r => String(r.status||'').toLowerCase() === 'graduated');
+  const totalGrads = grads.length;
+
+  const placed = grads.filter(r => {
+    const v = r.transitioned_alumni_chapter ?? r.transitioned_alumni_chapter_id;
+    return v != null && String(v).trim() !== '';
+  }).length;
+
+  const unplaced = Math.max(0, totalGrads - placed);
+
+  const el = document.getElementById('gradPlacementPie');
+  const note = document.getElementById('gradPlacementPieNote');
+  if (!el || !note) return;
+
+  if (totalGrads === 0){
+    if (el._chart) el._chart.destroy();
+    note.textContent = 'No graduated brothers yet.';
+    // Draw an empty pie to keep layout stable (optional)
+    el._chart = new Chart(el.getContext('2d'), {
+      type: 'doughnut',
+      data: { labels:['Placed','Unplaced'], datasets:[{ data:[0,1] }] },
+      options: { responsive:true, maintainAspectRatio:true, plugins:{ legend:{ position:'bottom' } }, cutout:'62%' }
+    });
+    return;
+  }
+
+  // brand colors
+  const css   = getComputedStyle(document.documentElement);
+  const royal = (css.getPropertyValue('--royal') || '#0b2b7e').trim();
+  const grey  = '#6b7280';
+
+  if (el._chart) el._chart.destroy();
+
+  el._chart = new Chart(el.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Placed in Alumni Chapter', 'Not Yet Placed'],
+      datasets: [{
+        data: [placed, unplaced],
+        backgroundColor: [hexToRgba(royal, 0.9), hexToRgba(grey, 0.2)],
+        borderColor: [royal, grey],
+        borderWidth: 1.5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: '62%',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 14, boxHeight: 14 } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed || 0;
+              const pct = totalGrads ? ((v/totalGrads)*100).toFixed(1) : '0.0';
+              return `${ctx.label}: ${v} (${pct}%)`;
+            }
+          }
+        }
+      }
     }
-  }
-
-  // As of: last yearly upload date
-  const lastUp = await (await fetch('/api/stats/yearly-last-upload')).json();
-  document.getElementById('asof').textContent = fmtAsOf(lastUp?.last_upload_at);
-
-  // Set latest and delta
-  document.getElementById('latestActive').textContent = latestVal.toLocaleString();
-  const dEl = document.getElementById('latestDelta');
-  const sign = delta > 0 ? '+' : (delta < 0 ? '' : '±');
-  dEl.textContent = `(${sign}${delta.toLocaleString()})`;
-  dEl.className = delta > 0 ? 'delta-positive' : (delta < 0 ? 'delta-negative' : 'delta-zero');
-
-  // Level + to next
-  const { current, toNextText } = evaluateLevel(latestVal, c.type);
-  const badge = document.getElementById('levelBadge');
-  badge.textContent = current.name;
-  badge.className = `level-badge ${current.cls}`;
-  document.getElementById('toNext').textContent = toNextText;
-
-  // Chart
-  new Chart(document.getElementById('growth'), {
-    type:'line',
-    data:{ labels, datasets:[{ label:'Active Members (year-end)', data: values }] }
   });
 
-  document.getElementById('loading').style.display='none';
-  document.getElementById('content').style.display='';
+  const pctPlaced = totalGrads ? ((placed/totalGrads)*100).toFixed(1) : '0.0';
+  note.textContent = `${placed}/${totalGrads} graduated brothers placed in an Alumni Chapter (${pctPlaced}%).`;
+}
+
+/* Append badges under Chapter Information → Badges */
+function maybeAddBadges(certifiedCount, activeCount){
+  const holder = document.getElementById('badges');
+  if (!holder) return;
+
+  // Clear placeholder
+  holder.innerHTML = '';
+
+  // Roster Accuracy: Total Brothers == Total Brothers on Campus
+  // (uses LATEST_ACTIVE_TOTAL and LAST_ACTIVE_ON_CAMPUS)
+  if (LATEST_ACTIVE_TOTAL > 0 && LATEST_ACTIVE_TOTAL === LAST_ACTIVE_ON_CAMPUS){
+    const img = document.createElement('img');
+    img.src = '/img/levels/roster.png';
+    img.alt = 'Roster Accuracy';
+    img.title = 'Roster Accuracy — Total Brothers equals Total Brothers on Campus';
+    img.style.height = '100px'; img.style.width = 'auto'; img.style.marginRight = '8px';
+    holder.appendChild(img);
+  }
+
+  // MIP Certified: 100% of active roster certified
+  if (activeCount > 0 && certifiedCount === activeCount){
+    const img = document.createElement('img');
+    img.src = '/img/levels/mip.png';
+    img.alt = '100% MIP Certified';
+    img.title = 'MIP Certified — 100% of active roster is certified';
+    img.style.height = '100px'; img.style.width = 'auto'; img.style.marginRight = '8px';
+    holder.appendChild(img);
+  }
+
+  if (!holder.hasChildNodes()){
+    holder.innerHTML = '<span class="text-muted">—</span>';
+  }
+}
+
+/* --- PIA detail toggle (unchanged) --- */
+let openProgram = null;
+const tileIds = ['tile-total','tile-bbb','tile-social','tile-education','tile-sbc'];
+
+function setActiveTile(tileId){
+  tileIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+  });
+  if (tileId){
+    const el = document.getElementById(tileId);
+    if (el) el.classList.add('active');
+  }
+}
+
+function programTitle(k){
+  if (k === 'total' || k === 'all') return 'All Programs';
+  if (k === 'bbb') return 'Bigger & Better Business';
+  if (k === 'social') return 'Social Action';
+  if (k === 'education') return 'Education';
+  if (k === 'sbc') return 'Sigma Beta Club';
+  return 'PIA Details';
+}
+
+async function showPiaDetails(id, key, tileId){
+  // toggle off if same tile clicked
+  if (openProgram === key){
+    document.getElementById('piaDetailsCard').style.display='none';
+    document.getElementById('piaDetailsContainer').innerHTML='';
+    openProgram = null;
+    setActiveTile(null);
+    return;
+  }
+
+  openProgram = key;
+  setActiveTile(tileId);
+
+  // If your backend expects "total" not "all", normalize here:
+  const programParam = (key === 'all') ? 'total' : key;
+
+  let rows = [];
+  try{
+    const res = await fetch(`/api/chapters/${id}/pia/details?program=${encodeURIComponent(programParam)}`);
+    if (!res.ok){
+      throw new Error(`HTTP ${res.status}`);
+    }
+    rows = await res.json();
+    if (!Array.isArray(rows)) rows = [];
+  }catch(err){
+    console.error('PIA detail fetch failed', err);
+    rows = [];
+  }
+
+  const c = document.getElementById('piaDetailsContainer');
+  c.innerHTML = `
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Program Date</th>
+            <th>Program Description</th>
+            <th class="text-end">Sigma Brothers Attending</th>
+            <th class="text-end">Total Hours</th>
+          </tr>
+        </thead>
+        <tbody id="piaRows">
+          ${rows.length === 0 ? `<tr><td colspan="4" class="text-muted">No entries found.</td></tr>` : ``}
+        </tbody>
+      </table>
+    </div>`;
+
+  if (rows.length){
+    const tb = c.querySelector('#piaRows');
+    rows.forEach(r=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${fmtDate(r.activity_date)}</td>
+        <td>${safe(r.description)}</td>
+        <td class="text-end">${r.brothers_attending ?? '—'}</td>
+        <td class="text-end">${(r.hours ?? 0).toLocaleString()}</td>`;
+      tb.appendChild(tr);
+    });
+  }
+
+  document.getElementById('piaDetailsTitle').textContent = programTitle(programParam);
+  document.getElementById('piaDetailsCard').style.display = '';
+}
+
+/* ------------- Roster ------------- */
+const STATUS_OPTIONS = ["Active","Graduated","Inactive","Suspended","Alumni"];
+function statusClass(value){
+  if(!value) return '';
+  const v = value.toLowerCase();
+  if (v==="active") return "status-active";
+  if (v==="graduated") return "status-graduated";
+  if (v==="inactive") return "status-inactive";
+  if (v==="suspended") return "status-suspended";
+  if (v==="alumni") return "status-alumni";
+  return "";
+}
+
+/* Show/hide */
+function initRosterToggle(){
+  const btn = document.getElementById('toggleRosterBtn');
+  const body = document.getElementById('rosterBody');
+  btn.addEventListener('click', ()=>{
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? '' : 'none';
+    btn.textContent = isHidden ? 'Hide' : 'Show';
+  });
+}
+
+/* Save status to backend */
+async function saveStatus(chapterId, memberId, newStatus){
+  const key = getAdminKey();
+  if (!key){
+    alert('Admin key required to save. Go to Admin page and click Save after entering your key.');
+    throw new Error('missing-admin-key');
+  }
+  const res = await fetch('/api/admin/roster/status', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-admin-key': key },
+    body: JSON.stringify({ chapter_id: chapterId, member_id: memberId, status: newStatus })
+  });
+  if (!res.ok){
+    const t = await res.text().catch(()=> '');
+    throw new Error(t || 'Failed to update');
+  }
+  return await res.json().catch(()=>({ok:true}));
+}
+
+/* ---- Chapters map (for Alumni Chapter names) ---- */
+let ALL_CHAPTERS_MAP = null;
+async function loadChaptersMap(){
+  if (ALL_CHAPTERS_MAP) return ALL_CHAPTERS_MAP;
+  try{
+    const rows = await (await fetch('/api/chapters')).json();
+    ALL_CHAPTERS_MAP = new Map((rows||[]).map(r => [String(r.id), r.name || r.chapter_name || `#${r.id}`]));
+  }catch(_e){ ALL_CHAPTERS_MAP = new Map(); }
+  return ALL_CHAPTERS_MAP;
+}
+
+
+/* Recompute campus total + pipeline and render those areas */
+function getStatusBadgeHTML(status){
+  const s = String(status||'').toLowerCase();
+  if (s === 'active')     return '<span class="badge text-bg-success badge-status">Active</span>';
+  if (s === 'graduated')  return '<span class="badge text-bg-warning badge-status">Graduated</span>';
+  if (s === 'suspended')  return '<span class="badge text-bg-danger badge-status">Suspended</span>';
+  if (s === 'alumni')     return '<span class="badge text-bg-info badge-status">Alumni</span>';
+  return '<span class="badge text-bg-secondary badge-status">' + (status||'—') + '</span>';
+}
+
+// Optional helper: resolve chapter name by id (cached)
+const __chapterNameCache = { map:null, loading:null };
+async function ensureChapterNameCache(){
+  if (__chapterNameCache.map) return __chapterNameCache.map;
+  if (!__chapterNameCache.loading){
+    __chapterNameCache.loading = fetch('/api/chapters')
+      .then(r=>r.json())
+      .then(list=>{
+        __chapterNameCache.map = new Map(list.map(c=>[String(c.id), c.name]));
+        return __chapterNameCache.map;
+      })
+      .catch(()=>{ __chapterNameCache.map = new Map(); return __chapterNameCache.map; });
+  }
+  return __chapterNameCache.loading;
+}
+function chapterNameById(id){
+  if (!id) return '—';
+  const key = String(id);
+  return (__chapterNameCache.map && __chapterNameCache.map.get(key)) || '—';
+}
+
+async function refreshCampusAndPipeline(rows){
+  const pbody = document.getElementById('pipelineRows');
+  const grads = [];
+  let activeCount = 0;
+
+  (rows||[]).forEach(r=>{
+    const status = (r.status||'').trim().toLowerCase();
+    if (status === 'active') activeCount++;
+    if (status === 'graduated') grads.push(r);
+  });
+
+  const campusTotalEl = document.getElementById('campusTotal');
+  if (campusTotalEl) campusTotalEl.textContent = (activeCount||0).toLocaleString();
+
+  // Resolve alumni chapter names if we might need them
+  if (grads.length) await ensureChapterNameCache();
+
+  // Render pipeline (Graduated only)
+  pbody.innerHTML = '';
+  if (!grads.length){
+    pbody.innerHTML = '<tr><td colspan="7" class="text-muted">No brothers in pipeline.</td></tr>';
+    document.getElementById('pipelineSection').style.display = '';
+    return;
+  }
+
+  grads
+    .sort((a,b) => (a.last_name||'').localeCompare(b.last_name||'') || (a.first_name||'').localeCompare(b.first_name||''))
+    .forEach(r=>{
+      const tr = document.createElement('tr');
+
+      const gradYear  = (r.graduation_year == null ? '' : String(r.graduation_year));
+      const alumniId  = r.transitioned_alumni_chapter_id || r.transitioned_alumni_chapter || null;
+      const alumniNm  = alumniId ? chapterNameById(alumniId) : '—';
+      const statusHtml = getStatusBadgeHTML(r.status);
+
+      tr.innerHTML = `
+        <td>${fullName(r)}</td>
+        <td>${safe(r.member_number)}</td>
+        <td>${fmtDate(r.initiated_date)}</td>
+        <td>${safe(r.financial_through)}</td>
+        <td>${statusHtml}</td>
+        <td>${gradYear || '—'}</td>
+        <td>${alumniNm}</td>
+      `;
+      pbody.appendChild(tr);
+    });
+
+  document.getElementById('pipelineSection').style.display = '';
+}
+
+/* Fetch advised collegiate chapters (IDs + Names) for an Alumni chapter. */
+async function fetchAdvisedCollegiateForAlumni(alumniId){
+  const urls = [
+    `/api/chapters/${alumniId}/advised-collegiate`,
+    `/api/chapters/${alumniId}/advised_collegiate`,
+    `/api/chapters/${alumniId}/advised-chapters`,
+    `/api/chapters/${alumniId}/advised`
+  ];
+  for (const url of urls){
+    try{
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const raw = await res.json();
+      const list = Array.isArray(raw) ? raw
+                : Array.isArray(raw?.chapters) ? raw.chapters
+                : Array.isArray(raw?.data) ? raw.data
+                : [];
+      if (list.length){
+        return list.map(ch => ({
+          id: ch.id || ch.chapter_id || ch.uuid,
+          name: ch.name || ch.chapter_name || `#${ch.id||'—'}`
+        })).filter(x => !!x.id);
+      }
+    }catch(_e){}
+  }
+  return [];
+}
+
+/* Build & render Alumni advisory pipeline from all advised collegiate chapters */
+async function buildAlumniAdvisoryPipeline(alumniChapterId){
+  // 1) Get advised collegiate chapter ids & names
+  const advised = await fetchAdvisedCollegiateForAlumni(alumniChapterId); // [{id,name}]
+  if (!advised.length){
+    // Still render an empty state (pie + table) to be explicit
+    renderAlumniPipelineTable([]);
+    renderAlumniPlacementPie([]);
+    document.getElementById('pipelineSection').style.display = '';
+    return;
+  }
+
+  // 2) Fetch each collegiate roster, collect graduates
+  const grads = [];
+  await Promise.all(advised.map(async (col) => {
+    try{
+      const roster = await (await fetch(`/api/chapters/${col.id}/roster`)).json();
+      (Array.isArray(roster) ? roster : []).forEach(r => {
+        if (String(r.status||'').toLowerCase() === 'graduated'){
+          grads.push({
+            first_name: r.first_name, last_name: r.last_name,
+            member_number: r.member_number,
+            graduated_from_name: col.name,
+            status: r.status,
+            transitioned_alumni_chapter_id: r.transitioned_alumni_chapter_id ?? r.transitioned_alumni_chapter ?? null
+          });
+        }
+      });
+    }catch(_e){}
+  }));
+
+  // 3) Ensure chapter-name cache for resolving alumni chapter names
+  if (grads.length) await ensureChapterNameCache();
+
+  // 4) Render table + pie using the aggregated graduates
+  renderAlumniPipelineTable(grads);
+  renderAlumniPlacementPie(grads);
+
+  // Show the section (in case it was hidden elsewhere)
+  document.getElementById('pipelineSection').style.display = '';
+}
+
+/* Render Alumni page pipeline: Name | Chapter | Status | Alumni Chapter Transitioned To */
+function renderAlumniPipelineTable(grads){
+  const header = document.getElementById('pipelineHeaderRow');
+  if (header){
+    header.innerHTML = `
+      <th>Name</th>
+      <th>Chapter</th>
+      <th>Status</th>
+      <th>Alumni Chapter Transitioned To</th>
+    `;
+  }
+
+  const tb = document.getElementById('pipelineRows');
+  tb.innerHTML = '';
+
+  if (!Array.isArray(grads) || grads.length === 0){
+    tb.innerHTML = '<tr><td colspan="4" class="text-muted">No graduated brothers found in advised chapters.</td></tr>';
+    return;
+  }
+
+  grads
+    .sort((a,b)=> (a.last_name||'').localeCompare(b.last_name||'') || (a.first_name||'').localeCompare(b.first_name||''))  
+    .forEach(r=>{
+      const alumniId = r.transitioned_alumni_chapter_id || null;
+      const alumniNm = alumniId ? chapterNameById(alumniId) : '—';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${[r.first_name, r.last_name].filter(Boolean).join(' ') || '—'}</td>
+        <td>${r.graduated_from_name || '—'}</td>
+        <td>${getStatusBadgeHTML(r.status)}</td>
+        <td>${alumniNm}</td>
+      `;
+      tb.appendChild(tr);
+    });
+}
+
+/* Render Alumni page "Collegiate → Alumni Success" pie from aggregate graduates */
+/* Render Alumni page "Collegiate → Alumni Success" pie from aggregate graduates */
+function renderAlumniPlacementPie(grads){
+  const totalGrads = Array.isArray(grads) ? grads.length : 0;
+  const placed = (grads||[]).filter(g => {
+    const v = g.transitioned_alumni_chapter_id;
+    return v != null && String(v).trim() !== '';
+  }).length;
+  const unplaced = Math.max(0, totalGrads - placed);
+
+  const el = document.getElementById('gradPlacementPie');
+  const note = document.getElementById('gradPlacementPieNote');
+  if (!el || !note) return;
+  const ctx = el.getContext('2d');
+  if (!ctx || typeof Chart === 'undefined') return;
+
+  // brand colors
+  const css   = getComputedStyle(document.documentElement);
+  const royal = (css.getPropertyValue('--royal') || '#0b2b7e').trim();
+  const grey  = '#6b7280';
+
+  if (el._chart) el._chart.destroy();
+
+  // If there are zero grads, draw a placeholder ring so the layout stays stable.
+  if (totalGrads === 0){
+    note.textContent = 'No graduated brothers yet across advised collegiate chapters.';
+    el._chart = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels:['Placed','Unplaced'], datasets:[{ data:[0,1], backgroundColor:[hexToRgba(royal,0.9), hexToRgba(grey,0.2)], borderColor:[royal, grey], borderWidth:1.5 }] },
+      options: { responsive:true, maintainAspectRatio:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:14, boxHeight:14 } } }, cutout:'62%' }
+    });
+    return;
+  }
+
+  el._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Placed in Alumni Chapter', 'Not Yet Placed'],
+      datasets: [{
+        data: [placed, unplaced],
+        backgroundColor: [hexToRgba(royal, 0.9), hexToRgba(grey, 0.2)],
+        borderColor: [royal, grey],
+        borderWidth: 1.5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: '62%',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 14, boxHeight: 14 } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed || 0;
+              const pct = totalGrads ? ((v/totalGrads)*100).toFixed(1) : '0.0';
+              return `${ctx.label}: ${v} (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const pctPlaced = ((placed/totalGrads)*100).toFixed(1);
+  note.textContent = `${placed}/${totalGrads} graduated brothers placed in an Alumni Chapter (${pctPlaced}%) across advised collegiate chapters.`;
+}
+
+/* Advisors: render cards (exact multi-line format) */
+function renderAdvisors(rows){
+  const list = document.getElementById('advisorsList');
+  if (!Array.isArray(rows) || rows.length===0){
+    list.innerHTML = '<div class="text-muted">No advisors on file.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  rows.forEach(a=>{
+    const div = document.createElement('div');
+    div.className = 'advisor-card d-flex align-items-center gap-3';
+    const photo = (a.photo_url && a.photo_url.trim()) ? a.photo_url.trim() : '/img/avatar-placeholder.png';
+
+    const advisingChapterName =
+      a.advising_chapter_name ||
+      (a.advising_chapter && (a.advising_chapter.name || a.advising_chapter.chapter_name)) ||
+      '';
+
+    const emailHtml = a.email ? `<a href="mailto:${a.email}">${a.email}</a>` : '—';
+    const phoneText = (a.phone && a.phone.trim()) ? a.phone : 'N/A';
+
+    div.innerHTML = `
+      <img src="${photo}" class="person-img" alt="Advisor photo" onerror="this.src='/img/avatar-placeholder.png'">
+      <div>
+        <div class="advisor-name">${a.name || '—'}</div>
+        ${advisingChapterName ? `<div>${advisingChapterName}</div>` : ''}
+        <div>📧 ${emailHtml}</div>
+        <div>📱 ${phoneText}</div>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+/* ---------- Advised Collegiate Chapters (ALUMNI ONLY) ---------- */
+function renderAdvisedChapters(rows){
+  const list = document.getElementById('advisedList');
+  if (!Array.isArray(rows) || rows.length===0){
+    list.innerHTML = '<div class="text-muted">No Collegiate Chapters Advised</div>';
+    return;
+  }
+  list.innerHTML = '';
+  rows.forEach(ch=>{
+    const el = document.createElement('div');
+    el.className = 'advised-item';
+    const crest = (ch.crest_url && ch.crest_url.trim()) ? ch.crest_url.trim() : '/img/crest-placeholder.png';
+    const subtitle = ch.university || ch.city || '';
+    el.innerHTML = `
+      <img class="advised-crest" src="${crest}" alt="Collegiate crest" onerror="this.src='/img/crest-placeholder.png'">
+      <div>
+        <div class="advised-name"><a href="/chapter/${ch.id}">${ch.name || ch.chapter_name || '—'}</a></div>
+        ${subtitle ? `<div class="advised-university">${subtitle}</div>` : ''}
+      </div>`;
+    list.appendChild(el);
+  });
+}
+
+/* Try several legacy endpoints and normalize shapes */
+async function loadAdvisedChapters(chapterId){
+  const urls = [
+    `/api/chapters/${chapterId}/advised-collegiate`,
+    `/api/chapters/${chapterId}/advised_collegiate`,
+    `/api/chapters/${chapterId}/advised-chapters`,
+    `/api/chapters/${chapterId}/advised`
+  ];
+  for (const url of urls){
+    try{
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const list =
+        Array.isArray(data) ? data :
+        Array.isArray(data?.chapters) ? data.chapters :
+        Array.isArray(data?.data) ? data.data : [];
+      if (Array.isArray(list)){
+        renderAdvisedChapters(list);
+        return;
+      }
+    }catch(_e){}
+  }
+  renderAdvisedChapters([]);
+}
+
+/* ======== MIP CERTIFICATION (ADDED) ======== */
+let MIP_INDEX = null;
+
+/* Normalize member id: keep digits only, trim */
+function normId(v){ return String(v==null?'':v).trim().replace(/\D+/g,''); }
+/* Build an index { normalizedId: 'YYYY-MM-DD' (latest) } from any shape */
+function buildMipIndex(payload){
+  const idx = {};
+  const setIfLatest = (rawId, rawDate)=>{
+    const id = normId(rawId);
+    if(!id) return;
+    const dstr = String(rawDate==null?'':rawDate).trim();
+    const d = new Date(dstr);
+    if (isNaN(d)) return;
+    const prev = idx[id] ? new Date(idx[id]) : null;
+    if (!prev || d > prev){ idx[id] = d.toISOString().slice(0,10); }
+  };
+
+  if (Array.isArray(payload)){
+    payload.forEach(rec=>{
+      const rid = rec.member_id ?? rec.member ?? rec.id ?? rec.MemberID ?? rec['Member #'];
+      const rdt = rec.cert_date ?? rec.certification_date ?? rec.date ?? rec.completed_on ?? rec['Certification Date'];
+      setIfLatest(rid, rdt);
+    });
+  } else if (payload && typeof payload === 'object'){
+    // object map of { "12345": "YYYY-MM-DD", ... }
+    Object.keys(payload).forEach(k=> setIfLatest(k, payload[k]));
+  }
+  return idx;
+}
+
+/* Load JSON from first working path */
+async function loadMipIndexOnce(){
+  if (MIP_INDEX) return MIP_INDEX;
+  const paths = ['/data/mip_certifications.json','/public/data/mip_certifications.json'];
+  for (const p of paths){
+    try{
+      const res = await fetch(p, {cache:'no-store'});
+      if (!res.ok) continue;
+      const data = await res.json();
+      MIP_INDEX = buildMipIndex(data);
+      return MIP_INDEX;
+    }catch(_e){}
+  }
+  MIP_INDEX = {};
+  return MIP_INDEX;
+}
+
+/* Compute status badge DOM for a member id */
+function renderMipBadge(memberNumber){
+  const id = normId(memberNumber);
+  const span = document.createElement('span');
+  span.className = 'badge badge-mip mip-unknown';
+  span.textContent = 'Not certified';
+  if (!MIP_INDEX || !id || !MIP_INDEX[id]) return span;
+
+  const certStr = MIP_INDEX[id]; // 'YYYY-MM-DD'
+  const certDate = new Date(certStr);
+  if (isNaN(certDate)) return span;
+
+  // Expiration: exactly one year after the certification date
+  const exp = new Date(certDate);
+  exp.setFullYear(exp.getFullYear() + 1);
+
+  const today = new Date();
+  const msPerDay = 24*60*60*1000;
+  const daysLeft = Math.ceil((exp - today) / msPerDay);
+
+  if (today > exp){
+    span.className = 'badge badge-mip mip-expired';
+    span.textContent = 'Expired';
+    span.title = `Expired on ${exp.toLocaleDateString()}`;
+  } else if (daysLeft <= 30){
+    span.className = 'badge badge-mip mip-warning';
+    span.textContent = `${daysLeft} day${daysLeft===1?'':'s'} left`;
+    span.title = `Expires on ${exp.toLocaleDateString()}`;
+  } else {
+    span.className = 'badge badge-mip mip-ok';
+    span.textContent = 'Certified';
+    span.title = `Certified ${certDate.toLocaleDateString()} • Expires ${exp.toLocaleDateString()}`;
+  }
+  return span;
+}
+
+/* Render roster table with editable status selects + MIP column */
+async function renderRoster(rows, chapterId){
+  await loadMipIndexOnce(); // ensure MIP_INDEX is ready
+
+  const tbody = document.getElementById('rosterRows');
+  tbody.innerHTML = '';
+
+  // Only show non-graduated in the roster table
+  const displayRows = (rows || []).filter(
+    r => String(r.status || '').toLowerCase() !== 'graduated'
+  );
+
+  displayRows.forEach(r => {
+    const status = r.status || '';
+    const memberId = r.id || r.member_number;
+
+    const tr = document.createElement('tr');
+
+    const tdName = document.createElement('td');
+    tdName.textContent = fullName(r);
+
+    const tdNum = document.createElement('td');
+    tdNum.textContent = safe(r.member_number);
+
+    const tdInit = document.createElement('td');
+    tdInit.textContent = fmtDate(r.initiated_date);
+
+    const tdFin = document.createElement('td');
+    tdFin.textContent = safe(r.financial_through);
+
+    const tdMip = document.createElement('td');
+    tdMip.appendChild(renderMipBadge(r.member_number));
+
+    const tdStatus = document.createElement('td');
+    const sel = document.createElement('select');
+    sel.className = `form-select form-select-sm status-select ${statusClass(status)}`;
+    STATUS_OPTIONS.forEach(opt=>{
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt;
+      if (opt.toLowerCase() === (status||'').toLowerCase()) o.selected = true;
+      sel.appendChild(o);
+    });
+
+    sel.addEventListener('change', async ()=>{
+      const prev = r.status || '';
+      const next = sel.value;
+      sel.className = `form-select form-select-sm status-select ${statusClass(next)}`;
+      r.status = next;
+      try{
+        await saveStatus(chapterId, memberId, next);
+      }catch(err){
+        r.status = prev;
+        Array.from(sel.options).forEach(o=>{o.selected = (o.value === prev);});
+        sel.className = `form-select form-select-sm status-select ${statusClass(prev)}`;
+        alert('Could not save status change. ' + (err?.message||''));
+      }finally{
+        // Recompute counts/charts from the full dataset
+        refreshCampusAndPipeline(rows);
+        renderMipPie(rows);
+        renderGradPlacementPie(rows);
+
+        // If status became Graduated, remove it from the visible roster immediately
+        if (String(r.status||'').toLowerCase() === 'graduated'){
+          renderRoster(rows, chapterId); // re-render with same source array
+        }
+      }
+    });
+
+    tdStatus.appendChild(sel);
+
+    tr.appendChild(tdName);
+    tr.appendChild(tdNum);
+    tr.appendChild(tdInit);
+    tr.appendChild(tdFin);
+    tr.appendChild(tdMip);
+    tr.appendChild(tdStatus);
+
+    tbody.appendChild(tr);
+  });
+
+// Initial totals/charts
+refreshCampusAndPipeline(rows);
+renderMipPie(rows);
+// Only render the collegiate pie on collegiate pages
+if (!window.IS_ALUMNI_CHAPTER) {
+  renderGradPlacementPie(rows);
+}
+}
+/* ======== END MIP ADDITIONS ======== */
+
+function labelPipelineAsAdvisory(){
+  const sec = document.querySelector('#pipelineSection .fw-semibold');
+  if (sec) sec.textContent = 'Collegiate → Alumni Pipeline (Advised Chapters)';
+}
+
+/* ---------------- main ---------------- */
+async function main(){
+  try {
+    const id = idFromPath();
+    if (!id) {
+      const loading = document.getElementById('loading');
+      if (loading) loading.textContent = 'Missing chapter id';
+      return;
+    }
+
+    // --- Chapter core ---
+    const c = await (await fetch('/api/chapters/' + id)).json();
+    document.getElementById('title').textContent = c.name || 'Chapter';
+    document.getElementById('subtitle').textContent = [c.type, c.city].filter(Boolean).join(' • ');
+    document.getElementById('type').textContent = c.type || '—';
+    document.getElementById('status').textContent = c.status || '—';
+    document.getElementById('city').textContent = c.city || '—';
+    document.getElementById('university').textContent = c.university || '—';
+    document.getElementById('charter').textContent = c.charter_date || '—';
+    renderSocialLinks(c);
+
+    // Hide campus band for Alumni chapters
+    const isAlumni = (c.type || '').toLowerCase() === 'alumni';
+window.IS_ALUMNI_CHAPTER = isAlumni; // <-- add this line
+if (isAlumni) {
+  const campusBand = document.getElementById('campusBand');
+  if (campusBand) campusBand.style.display = 'none';
+}
+
+    // Crest + President
+    const pr = await (await fetch(`/api/chapters/${id}/profile`)).json();
+    if (pr?.crest_url) {
+      const crest = document.getElementById('crest');
+      crest.src = pr.crest_url;
+      crest.style.display = '';
+    }
+    const presImg = document.getElementById('presidentPhoto');
+    presImg.src = '/img/avatar-placeholder.png';
+    if (pr?.president_photo_url && pr.president_photo_url.trim()) {
+      presImg.src = pr.president_photo_url.trim();
+    }
+    document.getElementById('presidentName').textContent = pr?.president_name || '—';
+    const pEmail = document.getElementById('presidentEmail');
+    pEmail.textContent = pr?.president_email || '';
+    pEmail.href = pr?.president_email ? `mailto:${pr.president_email}` : '#';
+
+    // ----- Advised Collegiate Chapters (ALUMNI ONLY) -----
+    const advisedBlock = document.getElementById('advisedBlock');
+    if (isAlumni) {
+      advisedBlock.style.display = '';
+      await loadAdvisedChapters(id);             // cards on left
+    } else {
+      advisedBlock.style.display = 'none';
+    }
+
+    // Advisors (only for Collegiate)
+    const isCollegiate = (c.type || '').toLowerCase() === 'collegiate';
+    const advBlock = document.getElementById('advisorsBlock');
+    if (isCollegiate) {
+      advBlock.style.display = '';
+      try {
+        const advisors = await (await fetch(`/api/chapters/${id}/advisors`)).json();
+        renderAdvisors(Array.isArray(advisors) ? advisors : []);
+      } catch (e) {
+        document.getElementById('advisorsList').innerHTML = '<div class="text-danger">Failed to load advisors.</div>';
+      }
+    } else {
+      advBlock.style.display = 'none';
+    }
+
+    // ---- History → totals & delta + level pill + line chart ----
+    const history = await (await fetch(`/api/chapters/${id}/history-yearly`)).json();
+    const labels = history.map(r => `${r.year}`);
+    const values = history.map(r => r.active_members);
+    let latestVal = 0, delta = 0;
+    if (history.length) {
+      latestVal = history.at(-1).active_members || 0;
+      if (history.length >= 2) delta = latestVal - (history.at(-2).active_members || 0);
+    }
+    LATEST_ACTIVE_TOTAL = latestVal;
+    document.getElementById('latestActive').textContent = latestVal.toLocaleString();
+    const dd = document.getElementById('latestDelta');
+    dd.textContent = delta > 0 ? `(+${delta.toLocaleString()})` : (delta < 0 ? `(${delta.toLocaleString()})` : '(±0)');
+    dd.className = delta > 0 ? 'delta delta-positive' : (delta < 0 ? 'delta delta-negative' : 'delta delta-zero');
+
+    const lastUp = await (await fetch('/api/stats/yearly-last-upload')).json();
+    document.getElementById('asof').textContent = fmtAsOf(lastUp?.last_upload_at);
+
+    const { current, toNextText } = evaluateLevel(latestVal, c.type);
+    const pill = document.getElementById('levelPill');
+    pill.className = `level-pill ${current.pill || 'pill-bronze'}`;
+    document.getElementById('levelName').textContent = current.name;
+    document.getElementById('levelIcon').src = current.icon;
+    document.getElementById('toNext').textContent = toNextText;
+
+    new Chart(document.getElementById('growth'), {
+      type: 'line',
+      data: { labels, datasets: [{ label: 'Active Members (year-end)', data: values }] }
+    });
+
+    // ---- PIA summary ----
+    const pia = await (await fetch(`/api/chapters/${id}/pia/summary`)).json();
+    document.getElementById('piaAsOf').textContent = fmtAsOf(pia?.as_of);
+    const fmt = n => n == null ? '—' : (+n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+    document.getElementById('kpi-pia-total').textContent = fmt(pia?.total_hours);
+    document.getElementById('kpi-pia-bbb').textContent = fmt(pia?.bbb_hours);
+    document.getElementById('kpi-pia-social').textContent = fmt(pia?.social_hours);
+    document.getElementById('kpi-pia-edu').textContent = fmt(pia?.education_hours);
+    document.getElementById('kpi-pia-sbc').textContent = fmt(pia?.sbc_hours);
+    const lastPia = await (await fetch(`/api/chapters/${id}/pia/last`)).json();
+    document.getElementById('kpi-pia-last').textContent = lastPia?.date ? fmtDate(lastPia.date) : '—';
+    document.getElementById('piaAsOf').textContent = fmtAsOf(pia?.as_of);
+
+    const fmtMoney = n => n == null ? '—' : (+n).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    document.getElementById('kpi-pia-scholarships').textContent = fmtMoney(pia?.scholarship_total);
+    document.getElementById('kpi-pia-blackspend').textContent = fmtMoney(pia?.black_spend_total);
+    document.getElementById('piaMoneyAsOf').textContent = fmtAsOf(pia?.as_of);
+
+    // PIA tiles
+    document.getElementById('tile-total').onclick     = () => showPiaDetails(id, 'all', 'tile-total');
+    document.getElementById('tile-bbb').onclick       = () => showPiaDetails(id, 'bbb', 'tile-bbb');
+    document.getElementById('tile-social').onclick    = () => showPiaDetails(id, 'social', 'tile-social');
+    document.getElementById('tile-education').onclick = () => showPiaDetails(id, 'education', 'tile-education');
+    document.getElementById('tile-sbc').onclick       = () => showPiaDetails(id, 'sbc', 'tile-sbc');
+    document.getElementById('piaCloseBtn').onclick    = () => { openProgram = null; document.getElementById('piaDetailsCard').style.display = 'none'; setActiveTile(null); };
+
+    // ---- Roster (always renders; Alumni pipeline will be overwritten next) ----
+    initRosterToggle();
+    try {
+      const roster = await (await fetch(`/api/chapters/${id}/roster`)).json();
+      renderRoster(Array.isArray(roster) ? roster : [], id);
+    } catch (e) {
+      document.getElementById('rosterRows').innerHTML = '<tr><td colspan="6" class="text-danger">Failed to load roster.</td></tr>';
+      const campusTotal = document.getElementById('campusTotal');
+      if (campusTotal) campusTotal.textContent = '—';
+    }
+
+    // ---- Alumni-only: overwrite pipeline table + success pie with ADVISORY aggregate ----
+    if (isAlumni) {
+      labelPipelineAsAdvisory();
+
+      // If helper wasn’t loaded, avoid ReferenceError and show a clear state.
+      if (typeof buildAlumniAdvisoryPipeline !== 'function') {
+        console.warn('Advisory builder not found; showing empty state.');
+        const tb = document.getElementById('pipelineRows');
+        if (tb) tb.innerHTML = '<tr><td colspan="4" class="text-muted">Advisory pipeline unavailable.</td></tr>';
+        document.getElementById('pipelineSection').style.display = '';
+      } else {
+        try {
+          await buildAlumniAdvisoryPipeline(id);
+        } catch (e) {
+          console.error('Advisory pipeline failed', e);
+          const tb = document.getElementById('pipelineRows');
+          if (tb) tb.innerHTML = '<tr><td colspan="4" class="text-muted">Could not load advised-chapter pipeline.</td></tr>';
+          document.getElementById('pipelineSection').style.display = '';
+        }
+      }
+    }
+
+  } catch (e) {
+    console.error('Chapter page failed', e);
+    const content = document.getElementById('content');
+    if (content) content.innerHTML = '<div class="alert alert-danger">Something went wrong loading this chapter.</div>';
+  } finally {
+    const loading = document.getElementById('loading');
+    const content = document.getElementById('content');
+    if (loading) loading.style.display = 'none';
+    if (content) content.style.display = '';
+  }
 }
 main();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body></html>

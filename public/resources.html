@@ -1,0 +1,290 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Resources • NC Sigma Portal</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/styles/site.css">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --royal:#0b2b7e; }
+  .resource-list a{ text-decoration:none }
+  .resource-list .list-group-item{ display:flex; align-items:center; justify-content:space-between }
+  .tag{font-size:.75rem;padding:.15rem .4rem;border-radius:.4rem;border:1px solid #e5e7eb;background:#f9fafb;color:#374151}
+  .section-title{ display:flex; align-items:center; justify-content:space-between; font-weight:800 }
+  .brand-card {
+    border-left: 4px solid var(--royal);
+  }
+</style>
+</head><body class="bg-light">
+<nav class="navbar navbar-dark">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a class="navbar-brand d-flex align-items-center brand" href="/">
+      <img src="/img/nc-crest.png" alt="NC Crest" onerror="this.style.display='none'">
+      <span>NC Sigma Portal</span>
+    </a>
+
+    <ul class="navbar-nav flex-row align-items-center gap-3">
+      <li class="nav-item"><a class="nav-link" href="/resources.html">Resources</a></li>
+      <li class="nav-item"><a class="nav-link" href="/chapters.html">Chapters</a></li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="/conferences/2025.html" id="confMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+          Conferences
+        </a>
+        <ul class="dropdown-menu" aria-labelledby="confMenu">
+          <li><a class="dropdown-item" href="/conferences/2025.html">2025 State Conference</a></li>
+          <li><a class="dropdown-item" href="/conferences/2026.html">2026 Regional Conference</a></li>
+        </ul>
+      </li>
+      <li class="nav-item"><a class="nav-link" href="/calendar">Calendar</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+    </ul>
+  </div>
+</nav>
+
+
+<div class="container py-4">
+  <h3 class="mb-3 fw-bold">Resources</h3>
+
+  <!-- Branding (new) -->
+  <div class="card h-100 brand-card">
+  <div class="card-header section-title">
+    <span>Branding (Logos, Templates, Style Guide)</span>
+    <div class="d-flex align-items-center gap-2">
+      <label for="brandTypeFilter" class="small text-muted mb-0">Type:</label>
+      <select id="brandTypeFilter" class="form-select form-select-sm" style="width:auto; min-width: 130px">
+        <option value="all">All</option>
+        <!-- options get populated by JS -->
+      </select>
+      <small class="text-muted" id="asOfBranding">—</small>
+    </div>
+  </div>
+  <ul id="listBranding" class="list-group list-group-flush resource-list"></ul>
+</div>
+
+<!-- Bylaws & International Documentation -->
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="card h-100">
+      <div class="card-header section-title">
+        <span>Bylaws &amp; International Documentation</span>
+        <small class="text-muted" id="asOfBylawsIntl">—</small>
+      </div>
+      <ul id="listBylawsIntl" class="list-group list-group-flush resource-list"></ul>
+    </div>
+  </div>
+</div>
+
+  <!-- Top two state-wide sections -->
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header section-title"><span>Collegiate</span><small class="text-muted" id="asOfCollegiate">—</small></div>
+        <ul id="listCollegiate" class="list-group list-group-flush resource-list"></ul>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header section-title"><span>Alumni</span><small class="text-muted" id="asOfAlumni">—</small></div>
+        <ul id="listAlumni" class="list-group list-group-flush resource-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Program Directors -->
+  <h5 class="mt-4 mb-2 fw-bold">Program Directors</h5>
+  <div class="row g-3">
+    <div class="col-lg-3">
+      <div class="card h-100">
+        <div class="card-header section-title"><span>Bigger &amp; Better Business</span><small class="text-muted" id="asOfBBB">—</small></div>
+        <ul id="listBBB" class="list-group list-group-flush resource-list"></ul>
+      </div>
+    </div>
+    <div class="col-lg-3">
+      <div class="card h-100">
+        <div class="card-header section-title"><span>Social Action</span><small class="text-muted" id="asOfSocial">—</small></div>
+        <ul id="listSocial" class="list-group list-group-flush resource-list"></ul>
+      </div>
+    </div>
+    <div class="col-lg-3">
+      <div class="card h-100">
+        <div class="card-header section-title"><span>Education</span><small class="text-muted" id="asOfEducation">—</small></div>
+        <ul id="listEducation" class="list-group list-group-flush resource-list"></ul>
+      </div>
+    </div>
+    <div class="col-lg-3">
+      <div class="card h-100">
+        <div class="card-header section-title"><span>Sigma Beta Club</span><small class="text-muted" id="asOfSBC">—</small></div>
+        <ul id="listSBC" class="list-group list-group-flush resource-list"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function fmtDate(iso){
+  if (!iso) return '—';
+  const d = new Date(iso); if (isNaN(d)) return '—';
+  const mm = String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'), yy=d.getFullYear();
+  return `${mm}/${dd}/${yy}`;
+}
+
+function pushDoc(listEl, doc){
+  const li = document.createElement('li');
+  li.className='list-group-item';
+  const left = document.createElement('div');
+  left.innerHTML = `
+    <div class="fw-semibold"><a href="${doc.file_url}" target="_blank" rel="noopener">${doc.title||'Untitled'}</a></div>
+    <div class="small text-muted">${doc.doc_type || ''} ${doc.tags? ' • '+doc.tags : ''}</div>
+  `;
+  const right = document.createElement('div');
+  right.innerHTML = `<span class="tag">${fmtDate(doc.publish_date)}</span>`;
+  li.appendChild(left); li.appendChild(right);
+  listEl.appendChild(li);
+}
+
+function setAsOf(elId, docs){
+  const newest = docs.reduce((acc,d)=> {
+    const t = Date.parse(d.publish_date || '') || 0;
+    return t>acc ? t : acc;
+  }, 0);
+  const el = document.getElementById(elId);
+  if (el) el.textContent = newest ? `as of ${fmtDate(newest)}` : '—';
+}
+
+/* ---------- Branding file-type detection & filtering ---------- */
+function detectType(doc){
+  // Prefer explicit fields if present
+  const dt = String(doc.doc_type || doc.type || '').toLowerCase();
+  if (dt) return normalizeType(dt);
+
+  // Fall back to URL extension
+  const url = String(doc.file_url || '').toLowerCase();
+  const m = url.match(/\.([a-z0-9]+)(?:\?|#|$)/);
+  return normalizeType(m ? m[1] : 'other');
+}
+
+function normalizeType(t){
+  // map many-to-one labels used in the filter UI
+  if (/(^|\/)(application\/)?pdf$|^pdf$/.test(t)) return 'pdf';
+  if (/^(doc|docx|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/.test(t)) return 'doc';
+  if (/^(ppt|pptx|application\/vnd\.ms-powerpoint|application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation)$/.test(t)) return 'ppt';
+  if (/^(png|jpe?g|svg|image\/)/.test(t)) return 'image';
+  if (/^(zip|application\/zip)$/.test(t)) return 'zip';
+  return 'other';
+}
+
+function prettyType(k){
+  return ({ pdf:'PDF', doc:'DOC/DOCX', ppt:'PPT/PPTX', image:'Images', zip:'ZIP', other:'Other' })[k] || k.toUpperCase();
+}
+
+function renderListSimple(listId, arr){
+  const el = document.getElementById(listId);
+  if (!el) return;
+  el.innerHTML = '';
+  if (!arr.length){
+    el.innerHTML = '<li class="list-group-item text-muted">No items yet.</li>';
+    return;
+  }
+  arr.sort((a,b)=> (b.publish_date||'').localeCompare(a.publish_date||''))
+     .forEach(d => pushDoc(el, d));
+}
+
+async function main(){
+  const docs = await (await fetch('/api/documents')).json();
+  const normalize = s => (s||'').toLowerCase();
+
+  // Existing groups
+  const branding   = docs.filter(d => normalize(d.group)==='branding');
+  const collegiate = docs.filter(d => normalize(d.group)==='collegiate');
+  const alumni     = docs.filter(d => normalize(d.group)==='alumni');
+  const bbb        = docs.filter(d => normalize(d.group)==='bbb' || normalize(d.group)==='bigger & better business');
+  const social     = docs.filter(d => normalize(d.group)==='social action' || normalize(d.group)==='social');
+  const education  = docs.filter(d => normalize(d.group)==='education');
+  const sbc        = docs.filter(d => normalize(d.group)==='sbc' || normalize(d.group)==='sigma beta club');
+
+  // NEW: Bylaws & International Documentation (aggregate common labels)
+  const bylawsIntl = docs.filter(d => {
+    const g = normalize(d.group);
+    return g==='bylaws'
+        || g==='international'
+        || g==='international documentation'
+        || g==='bylaws & international'
+        || g==='bylaws and international';
+  });
+
+  /* ---- Render the simple lists ---- */
+  renderListSimple('listCollegiate', collegiate);
+  renderListSimple('listAlumni', alumni);
+  renderListSimple('listBBB', bbb);
+  renderListSimple('listSocial', social);
+  renderListSimple('listEducation', education);
+  renderListSimple('listSBC', sbc);
+  renderListSimple('listBylawsIntl', bylawsIntl);
+
+  // as-of dates
+  setAsOf('asOfCollegiate', collegiate);
+  setAsOf('asOfAlumni', alumni);
+  setAsOf('asOfBBB', bbb);
+  setAsOf('asOfSocial', social);
+  setAsOf('asOfEducation', education);
+  setAsOf('asOfSBC', sbc);
+  setAsOf('asOfBylawsIntl', bylawsIntl);
+
+  /* ---- Branding with file-type filter ---- */
+  const $listBranding = document.getElementById('listBranding');
+  const $filter = document.getElementById('brandTypeFilter');
+
+  // compute available types present in Branding
+  const typeSet = new Set( branding.map(detectType) ); // e.g., pdf, doc, ppt, image, zip, other
+
+  // populate dropdown (keep "All" first)
+  if ($filter){
+    // Remove any runtime-added options (keep 'all')
+    $filter.querySelectorAll('option:not([value="all"])').forEach(o=>o.remove());
+    Array.from(typeSet)
+      .sort() // alphabetical by key
+      .forEach(k=>{
+        const opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = prettyType(k);
+        $filter.appendChild(opt);
+      });
+  }
+
+  function renderBranding(){
+    const val = ($filter?.value || 'all');
+    let rows = branding.slice();
+    if (val !== 'all'){
+      rows = rows.filter(d => detectType(d) === val);
+    }
+    // render + update as-of based on visible set
+    renderListSimple('listBranding', rows);
+    setAsOf('asOfBranding', rows.length ? rows : branding);
+  }
+
+  // initial render
+  renderBranding();
+
+  // change handler
+  $filter?.addEventListener('change', renderBranding);
+
+  function getAdminKey(){ try{ return localStorage.getItem('adminKey') || ''; }catch{ return ''; } }
+const IS_ADMIN = !!getAdminKey();
+
+async function deleteDocInline(id, liEl){
+  const key = getAdminKey(); if (!key) return alert('No admin key found in this browser.');
+  if (!confirm('Delete this resource?')) return;
+  const res = await fetch('/api/admin/documents/delete', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-admin-key': key },
+    body: JSON.stringify({ id })
+  });
+  const ok = res.ok;
+  const out = await res.text().catch(()=> '');
+  if (!ok) { alert('Delete failed:\n' + out); return; }
+  if (liEl && liEl.parentNode) liEl.parentNode.removeChild(liEl);
+}
+}
+main();
+</script>
+</body></html>

@@ -1,317 +1,875 @@
-<!doctype html><html lang="en"><head>
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Admin • NC Sigma Portal</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles/site.css">
 <style>
-  .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
-  .help{color:#6b7280}
+  :root{ --royal:#0b2b7e; }
+  .card h5{ margin:0; }
+  .header{ background:var(--royal); color:#fff; border-radius:12px; padding:.8rem 1rem; }
+  pre{ white-space:pre-wrap; }
+  .flyer-thumb{ max-width:120px; max-height:120px; border-radius:8px; border:1px solid #e5e7eb; }
+  .table-sm td, .table-sm th { padding:.45rem .5rem; vertical-align: middle; }
+  .status-badge{ font-size:.75rem; }
 </style>
-</head><body class="bg-light">
+</head>
+<body class="bg-light">
 <nav class="navbar navbar-dark">
   <div class="container d-flex align-items-center justify-content-between">
     <a class="navbar-brand d-flex align-items-center brand" href="/">
       <img src="/img/nc-crest.png" alt="NC Crest" onerror="this.style.display='none'">
       <span>NC Sigma Portal</span>
     </a>
-    <div class="navbar-nav">
-      <a class="nav-link" href="/documents.html">Documents</a>
-      <a class="nav-link" href="/media.html">Media</a>
-      <a class="nav-link" href="/chapters.html">Chapters</a>
-      <a class="nav-link" href="/calendar">Calendar</a>
-      <a class="nav-link active" href="/admin">Admin</a>
-    </div>
+
+    <ul class="navbar-nav flex-row align-items-center gap-3">
+      <li class="nav-item"><a class="nav-link" href="/resources.html">Resources</a></li>
+      <li class="nav-item"><a class="nav-link" href="/chapters.html">Chapters</a></li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="/conferences/2025.html" id="confMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+          Conferences
+        </a>
+        <ul class="dropdown-menu" aria-labelledby="confMenu">
+          <li><a class="dropdown-item" href="/conferences/2025.html">2025 State Conference</a></li>
+          <li><a class="dropdown-item" href="/conferences/2026.html">2026 Regional Conference</a></li>
+        </ul>
+      </li>
+      <li class="nav-item"><a class="nav-link" href="/calendar">Calendar</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+    </ul>
   </div>
 </nav>
 
 <div class="container py-4">
-
-  <!-- Admin key -->
-  <div class="alert alert-info d-flex align-items-center justify-content-between">
-    <div>Admin actions require your key.</div>
-    <input id="adminKey" type="password" class="form-control" style="max-width:280px" placeholder="Admin Key">
+  <div class="header mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap">
+      <div class="fs-5 fw-semibold">Admin Console</div>
+      <div class="d-flex align-items-center gap-2">
+        <input id="adminKey" type="password" placeholder="Admin Key" class="form-control form-control-sm" style="width:220px">
+        <button class="btn btn-sm btn-light" onclick="saveKey()">Save</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Import Chapters + EOY -->
-  <div class="card mb-4">
-    <div class="card-header">Import Chapters + EOY (Q4) <span class="help">(supports ?dryRun=true)</span></div>
-    <div class="card-body">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-4">
-          <label class="form-label">Chapters Excel</label>
-          <input id="chFile" type="file" class="form-control" accept=".xls,.xlsx">
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">EOY Excel</label>
-          <input id="eoyFile" type="file" class="form-control" accept=".xls,.xlsx">
-        </div>
-        <div class="col-md-2">
-          <label class="form-label">Dry Run</label>
-          <select id="dryRun" class="form-select">
-            <option value="false" selected>No</option>
-            <option value="true">Yes</option>
-          </select>
-        </div>
-        <div class="col-md-2 text-end">
-          <button id="doImport" class="btn btn-primary w-100">Upload</button>
+  <div class="row g-3">
+    <!-- A. Chapters (independent) -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <h5>Chapters Import (Independent)</h5>
+          <p class="text-muted mb-2 small">Upload the <strong>North Carolina Chapters</strong> sheet. Existing chapters are kept/updated; missing ones are added.</p>
+          <form id="formChaptersOnly" onsubmit="return uploadChaptersOnly(event)">
+            <div class="mb-2">
+              <input class="form-control" type="file" name="chaptersFile" accept=".xlsx,.xls" required>
+            </div>
+            <button class="btn btn-primary">Upload Chapters</button>
+          </form>
+          <pre id="resChaptersOnly" class="mt-2 small"></pre>
         </div>
       </div>
-      <pre id="importOut" class="mt-3 mono small"></pre>
     </div>
-  </div>
 
-  <!-- Import Yearly History -->
-  <div class="card mb-4">
-    <div class="card-header">Import Yearly History <span class="help">(LONG or WIDE; supports ?dryRun=true)</span></div>
-    <div class="card-body">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-6">
-          <input id="histFile" type="file" class="form-control" accept=".xls,.xlsx">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Dry Run</label>
-          <select id="dryRunYearly" class="form-select">
-            <option value="false" selected>No</option>
-            <option value="true">Yes</option>
-          </select>
-        </div>
-        <div class="col-md-3 text-end">
-          <button id="doImportYearly" class="btn btn-success w-100">Upload Yearly History</button>
+    <!-- B. EOY (independent) -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <h5>EOY Report Import (Independent)</h5>
+          <p class="text-muted small mb-2">Upload the EOY report (sheet <i>Southeastern</i>, rows begin at A24). This writes yearly totals for existing chapters only.</p>
+          <form id="formEOYOnly" onsubmit="return uploadEOYOnly(event)">
+            <div class="mb-2">
+              <input class="form-control" type="file" name="eoyFile" accept=".xlsx,.xls" required>
+            </div>
+            <button class="btn btn-primary">Upload EOY</button>
+          </form>
+          <pre id="resEOYOnly" class="mt-2 small"></pre>
         </div>
       </div>
-      <pre id="histOut" class="mt-3 mono small"></pre>
     </div>
-  </div>
 
-  <!-- Chapter Profile (crest & president) -->
-  <div class="card mb-4">
-    <div class="card-header">Chapter Profile (Crest & President)</div>
-    <div class="card-body">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-4">
-          <label class="form-label">Select Chapter</label>
-          <select id="profChapter" class="form-select"></select>
-        </div>
-        <div class="col-md-2">
-          <button id="loadProf" class="btn btn-outline-secondary w-100">Load</button>
-        </div>
-        <div class="col-md-6 help">
-          Tip: Use the Image Uploader below to get URLs for crest and headshot.
-        </div>
-        <div class="col-12"><hr></div>
-        <div class="col-md-6">
-          <label class="form-label">Crest URL</label>
-          <input id="crestUrl" type="url" class="form-control" placeholder="/uploads/chapters/crest.png or https://...">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">President Photo URL</label>
-          <input id="presPhoto" type="url" class="form-control" placeholder="/uploads/chapters/president.jpg or https://...">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">President Name</label>
-          <input id="presName" type="text" class="form-control">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">President Email</label>
-          <input id="presEmail" type="email" class="form-control" placeholder="name@domain.com">
-        </div>
-        <div class="col-12 text-end">
-          <button id="saveProf" class="btn btn-success">Save Profile</button>
+    <!-- C. Chapter History -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <h5>Chapter History (Yearly)</h5>
+          <p class="text-muted small mb-2">Upload either:
+            <br>• <strong>LONG</strong>: Chapter | Year | Active Members
+            <br>• <strong>WIDE</strong>: Chapter | 2021 | 2022 | 2023 | ...
+          </p>
+          <form id="formHistory" onsubmit="return uploadHistory(event)">
+            <div class="mb-2">
+              <input class="form-control" type="file" name="historyFile" accept=".xlsx,.xls" required>
+            </div>
+            <button class="btn btn-primary">Upload History</button>
+          </form>
+          <pre id="resHistory" class="mt-2 small"></pre>
         </div>
       </div>
-      <pre id="profOut" class="mt-3 mono small"></pre>
+    </div>
+
+<!-- D. PIA -->
+<div class="col-lg-6">
+  <div class="card">
+    <div class="card-body">
+      <h5>PIA Import</h5>
+      <p class="text-muted small mb-2">
+        Upload the BluPrint export (headers typically on row 3). This will import
+        date, year, hours and flags into <code>pia_entries</code>.
+      </p>
+
+      <form id="formPIA" onsubmit="return uploadPIA(event)">
+        <div class="mb-2">
+          <!-- important: use name="file" -->
+          <input class="form-control" id="piaFile" name="file" type="file" accept=".xlsx,.xls" required>
+        </div>
+        <button class="btn btn-primary">Upload PIA</button>
+      </form>
+      <pre id="resPIA" class="mt-2 small"></pre>
     </div>
   </div>
+</div>
 
-  <!-- NEW: Image Uploader -->
-  <div class="card mb-4">
-    <div class="card-header">Image Uploader</div>
+    <!-- E. Roster Import -->
+<div class="col-lg-6">
+  <div class="card">
     <div class="card-body">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-3">
-          <label class="form-label">Folder</label>
-          <select id="imgKind" class="form-select">
-            <option value="chapters">Chapters (crests, headshots)</option>
-            <option value="events">Events (flyers)</option>
-          </select>
+      <h5>Roster Import (Full Roster Excel)</h5>
+      <p class="text-muted small mb-2">
+        Columns expected: <strong>Chapter</strong>, <strong>First Name</strong>, <strong>Last Name</strong>,
+        <strong>Member Number</strong>, <strong>Initiated date</strong>, <strong>Years Paid</strong>, (optional) <strong>Status</strong>.
+        “Financial Through” is computed from the last year in “Years Paid” (e.g., <code>23,24,25</code> → <code>2025</code>).
+      </p>
+      <form id="formRoster" onsubmit="return uploadRoster(event)">
+        <div class="mb-2">
+          <input class="form-control" type="file" name="rosterFile" accept=".xlsx,.xls" required>
         </div>
-        <div class="col-md-6">
-          <input id="imgFile" type="file" class="form-control" accept="image/*">
-        </div>
-        <div class="col-md-3 text-end">
-          <button id="doUploadImage" class="btn btn-primary w-100">Upload Image</button>
+        <button class="btn btn-primary">Upload Roster</button>
+      </form>
+      <pre id="resRoster" class="mt-2 small"></pre>
+    </div>
+  </div>
+</div>
+
+
+    <!-- F. Chapter Profile -->
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5>Chapter Profile (Crest & President)</h5>
+          <p class="text-muted small mb-2">Select a chapter and save crest/president details. Use full URLs for images (S3, etc.).</p>
+
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Chapter</label>
+              <select id="cpChapter" class="form-select"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Crest URL</label>
+              <input id="cpCrest" class="form-control" placeholder="https://.../crest.png">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">President Photo URL</label>
+              <input id="cpPhoto" class="form-control" placeholder="https://.../photo.jpg">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">President Name</label>
+              <input id="cpName" class="form-control" placeholder="First Last">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">President Email</label>
+              <input id="cpEmail" class="form-control" placeholder="name@domain.com">
+            </div>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+          </div>
+          <pre id="resProfile" class="mt-2 small"></pre>
         </div>
       </div>
-      <div class="help mt-2">After upload, copy the URL into the Chapter Profile form above.</div>
-      <pre id="imgOut" class="mt-3 mono small"></pre>
     </div>
+
+    <hr class="mt-4">
+<h5>Advisors</h5>
+<p class="text-muted small mb-2">Add a chapter advisor (multiple allowed). Photos may be full URLs.</p>
+
+<div class="row g-3 align-items-end">
+  <div class="col-md-4">
+    <label class="form-label">Advisor Name</label>
+    <input id="advName" class="form-control" placeholder="First Last">
   </div>
+  <div class="col-md-3">
+    <label class="form-label">Advisor Email</label>
+    <input id="advEmail" class="form-control" placeholder="name@domain.com">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Advisor Phone</label>
+    <input id="advPhone" class="form-control" placeholder="(###) ###-####">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label">Photo URL</label>
+    <input id="advPhoto" class="form-control" placeholder="https://.../photo.jpg">
+  </div>
+  <div class="col-12">
+    <button class="btn btn-primary" onclick="addAdvisor()">Add Advisor</button>
+  </div>
+</div>
 
-  <!-- NEW: Events (create minimal) -->
-  <div class="card mb-4">
-    <div class="card-header">Create Event (appears on Calendar & ICS)</div>
-    <div class="card-body">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-4">
-          <label class="form-label">Chapter</label>
-          <select id="evChapter" class="form-select"></select>
-        </div>
-        <div class="col-md-8">
-          <label class="form-label">Title</label>
-          <input id="evTitle" type="text" class="form-control" placeholder="Event title">
-        </div>
+<div class="mt-3">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead class="table-light">
+        <tr><th>Advisor</th><th>Email / Phone</th><th>Photo</th><th style="width:1%"></th></tr>
+      </thead>
+      <tbody id="advisorRows"><tr><td colspan="4" class="text-muted">Select a chapter to load advisors…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+<pre id="resAdvisors" class="mt-2 small"></pre>
 
-        <div class="col-md-6">
-          <label class="form-label">Start (local time)</label>
-          <input id="evStart" type="datetime-local" class="form-control">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">End (optional)</label>
-          <input id="evEnd" type="datetime-local" class="form-control">
-        </div>
+    <!-- G. Resources Upload (Local file OR Link) -->
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5>Resources Upload (Branding, Collegiate, Alumni, Programs, Bylaws & International)</h5>
+          <p class="text-muted small mb-2">Upload a local file <em>or</em> save a link (S3/Drive/etc). Choose the section where it should appear.</p>
 
-        <div class="col-md-6">
-          <label class="form-label">Location</label>
-          <input id="evLoc" type="text" class="form-control" placeholder="Address or venue">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Visibility</label>
-          <select id="evVis" class="form-select">
-            <option>Public</option>
-            <option>Brothers</option>
-            <option>Officers</option>
-          </select>
-        </div>
+          <!-- Mode toggle -->
+          <div class="mb-3">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="mode" id="modeFile" value="file" checked>
+              <label class="form-check-label" for="modeFile">Upload File</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="mode" id="modeLink" value="link">
+              <label class="form-check-label" for="modeLink">Use Link</label>
+            </div>
+          </div>
 
-        <div class="col-12">
-          <label class="form-label">Description</label>
-          <textarea id="evDesc" class="form-control" rows="3" placeholder="Details, agenda, links…"></textarea>
-        </div>
+          <form id="formDoc">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Title</label>
+                <input class="form-control" name="title" required placeholder="e.g., NC Brand Guide 2025">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Group</label>
+                <select class="form-select" name="group" required>
+                  <option value="">Select…</option>
+                  <option value="Branding">Branding</option>
+                  <option value="Collegiate">Collegiate</option>
+                  <option value="Alumni">Alumni</option>
+                  <option value="BBB">BBB</option>
+                  <option value="Social Action">Social Action</option>
+                  <option value="Education">Education</option>
+                  <option value="SBC">Sigma Beta Club</option>
+                  <option value="Bylaws & International">Bylaws & International Documentation</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Type</label>
+                <input class="form-control" name="doc_type" placeholder="Guide, Template, Logo, PDF…">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Publish Date</label>
+                <input class="form-control" name="publish_date" type="date">
+              </div>
 
-        <div class="col-12 text-end">
-          <button id="saveEvent" class="btn btn-success">Save Event</button>
+              <!-- File mode -->
+              <div class="col-md-8" id="fileRow">
+                <label class="form-label">Choose File</label>
+                <input class="form-control" type="file" name="file" />
+                <div class="form-text">Accepted: any file (served from this server under /uploads/resources/...)</div>
+              </div>
+
+              <!-- Link mode -->
+              <div class="col-md-8 d-none" id="linkRow">
+                <label class="form-label">File URL</label>
+                <input class="form-control" name="file_url" placeholder="https://...">
+              </div>
+
+              <div class="col-md-2">
+                <label class="form-label">Visibility</label>
+                <select class="form-select" name="visibility">
+                  <option value="public" selected>public</option>
+                  <option value="members">members</option>
+                  <option value="private">private</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Tags</label>
+                <input class="form-control" name="tags" placeholder="comma,separated">
+              </div>
+            </div>
+            <div class="mt-3">
+              <button class="btn btn-primary" onclick="return saveResource(event)">Save Resource</button>
+            </div>
+          </form>
+
+          <pre id="resDoc" class="mt-2 small"></pre>
         </div>
       </div>
-      <pre id="evOut" class="mt-3 mono small"></pre>
+    </div>
+
+<!-- I. Manage Resources -->
+<div class="col-lg-12">
+  <div class="card">
+    <div class="card-body">
+      <h5>Manage Resources</h5>
+      <div class="d-flex gap-2 align-items-center mb-2">
+        <input id="docSearch" class="form-control form-control-sm" placeholder="Search title, type, tags…" style="max-width:320px">
+        <select id="docGroup" class="form-select form-select-sm" style="max-width:220px">
+          <option value="">All Groups</option>
+          <option value="Branding">Branding</option>
+          <option value="Collegiate">Collegiate</option>
+          <option value="Alumni">Alumni</option>
+          <option value="BBB">BBB</option>
+          <option value="Social Action">Social Action</option>
+          <option value="Education">Education</option>
+          <option value="SBC">Sigma Beta Club</option>
+          <option value="Bylaws & International">Bylaws & International Documentation</option>
+        </select>
+        <button class="btn btn-outline-primary btn-sm" onclick="loadDocs()">Refresh</button>
+        <span id="docCount" class="small text-muted ms-auto">—</span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width:240px">Title</th>
+              <th>Group</th>
+              <th>Type</th>
+              <th>Tags</th>
+              <th>Publish Date</th>
+              <th style="width:1%"></th>
+            </tr>
+          </thead>
+          <tbody id="docsBody">
+            <tr><td colspan="6" class="text-muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <pre id="resDocs" class="mt-2 small"></pre>
     </div>
   </div>
+</div>
 
-  <!-- NEW: CSV Exports -->
-  <div class="card mb-4">
-    <div class="card-header">Exports</div>
-    <div class="card-body d-flex gap-2 flex-wrap">
-      <a class="btn btn-outline-secondary" href="/api/export/chapters.csv">Download Chapters CSV</a>
-      <a class="btn btn-outline-secondary" href="/api/export/yearly_stats.csv">Download Yearly Stats CSV</a>
-      <a class="btn btn-outline-secondary" href="/calendar.ics" target="_blank">Calendar ICS</a>
+    <!-- H. Calendar Approvals -->
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5>Calendar Approvals</h5>
+          <p class="text-muted small mb-2">Review pending program submissions. Approvals appear immediately on the public calendar.</p>
+
+          <div class="d-flex gap-2 mb-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="loadPending()">Refresh</button>
+            <span id="pendingCount" class="badge text-bg-secondary align-self-center">0 pending</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Program</th>
+                  <th>Chapter</th>
+                  <th>Date/Time</th>
+                  <th>Location</th>
+                  <th>Flyer</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pendingBody">
+                <tr><td colspan="6" class="text-muted">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <pre id="resCalendar" class="mt-2 small"></pre>
+        </div>
+      </div>
     </div>
-  </div>
 
+  </div>
 </div>
 
 <script>
-async function loadChaptersTo(selectId){
-  const res = await fetch('/api/chapters');
-  const chapters = await res.json();
-  const sel = document.getElementById(selectId);
-  sel.innerHTML = '';
-  chapters.forEach(c=>{
-    const opt = document.createElement('option');
-    opt.value = c.id; opt.textContent = c.name;
-    sel.appendChild(opt);
+function getKey(){ return localStorage.getItem('adminKey') || ''; }
+function saveKey(){
+  const v = document.getElementById('adminKey').value.trim();
+  localStorage.setItem('adminKey', v);
+  alert('Admin key saved in this browser.');
+}
+document.getElementById('adminKey').value = getKey();
+
+/* Load chapters into profile selector */
+async function loadChapters(){
+  const sel = document.getElementById('cpChapter');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Loading…</option>';
+  const rows = await (await fetch('/api/chapters')).json();
+  sel.innerHTML = '<option value="">Select a chapter…</option>' + rows.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+}
+loadChapters();
+
+/* Upload handlers (independent) */
+async function uploadChaptersOnly(e){
+  e.preventDefault();
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  const fd = new FormData(document.getElementById('formChaptersOnly'));
+  const res = await fetch('/api/admin/chapters/import', {
+    method:'POST',
+    headers:{ 'x-admin-key': key },
+    body: fd
   });
+  const out = await res.json();
+  document.getElementById('resChaptersOnly').textContent = JSON.stringify(out, null, 2);
+  if (res.ok) loadChapters();
+  return false;
 }
 
-// Populate dropdowns on load
-loadChaptersTo('profChapter');
-loadChaptersTo('evChapter');
-
-// Import (chapters + eoy)
-document.getElementById('doImport').onclick = async ()=>{
-  const key = document.getElementById('adminKey').value;
-  const dry = document.getElementById('dryRun').value;
-  const fd = new FormData();
-  const ch  = document.getElementById('chFile').files[0];
-  const eoy = document.getElementById('eoyFile').files[0];
-  if (!ch || !eoy) { alert('Choose both files'); return; }
-  fd.append('chaptersFile', ch);
-  fd.append('eoyFile', eoy);
-  const res = await fetch('/api/admin/import?dryRun='+dry, { method:'POST', headers:{'x-admin-key':key}, body: fd });
-  document.getElementById('importOut').textContent = JSON.stringify(await res.json(), null, 2);
-};
-
-// Import Yearly
-document.getElementById('doImportYearly').onclick = async ()=>{
-  const key = document.getElementById('adminKey').value;
-  const dry = document.getElementById('dryRunYearly').value;
-  const fd = new FormData();
-  const f  = document.getElementById('histFile').files[0];
-  if (!f) { alert('Choose a file'); return; }
-  fd.append('historyFile', f);
-  const res = await fetch('/api/admin/import-yearly?dryRun='+dry, { method:'POST', headers:{'x-admin-key':key}, body: fd });
-  document.getElementById('histOut').textContent = JSON.stringify(await res.json(), null, 2);
-};
-
-// Profiles
-document.getElementById('loadProf').onclick = async ()=>{
-  const id = document.getElementById('profChapter').value;
-  const r = await fetch(`/api/chapters/${id}/profile`);
-  const p = await r.json();
-  document.getElementById('crestUrl').value  = p.crest_url || '';
-  document.getElementById('presPhoto').value = p.president_photo_url || '';
-  document.getElementById('presName').value  = p.president_name || '';
-  document.getElementById('presEmail').value = p.president_email || '';
-};
-
-document.getElementById('saveProf').onclick = async ()=>{
-  const id = document.getElementById('profChapter').value;
-  const key = document.getElementById('adminKey').value;
-  const body = {
-    crest_url: document.getElementById('crestUrl').value || null,
-    president_photo_url: document.getElementById('presPhoto').value || null,
-    president_name: document.getElementById('presName').value || null,
-    president_email: document.getElementById('presEmail').value || null
-  };
-  const res = await fetch(`/api/admin/chapters/${id}/profile`, {
+async function uploadEOYOnly(e){
+  e.preventDefault();
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  const fd = new FormData(document.getElementById('formEOYOnly'));
+  const res = await fetch('/api/admin/eoy/import', {
     method:'POST',
-    headers:{'Content-Type':'application/json','x-admin-key':key},
-    body: JSON.stringify(body)
+    headers:{ 'x-admin-key': key },
+    body: fd
   });
-  document.getElementById('profOut').textContent = JSON.stringify(await res.json(), null, 2);
-};
+  const out = await res.json();
+  document.getElementById('resEOYOnly').textContent = JSON.stringify(out, null, 2);
+  return false;
+}
 
-// Image upload
-document.getElementById('doUploadImage').onclick = async ()=>{
-  const key = document.getElementById('adminKey').value;
-  const kind = document.getElementById('imgKind').value;
-  const file = document.getElementById('imgFile').files[0];
-  if (!file) { alert('Choose an image'); return; }
-  const fd = new FormData();
-  fd.append('image', file);
-  const res = await fetch('/api/admin/upload-image/'+kind, { method:'POST', headers:{'x-admin-key':key}, body: fd });
-  document.getElementById('imgOut').textContent = JSON.stringify(await res.json(), null, 2);
-};
-
-// Events
-document.getElementById('saveEvent').onclick = async ()=>{
-  const key = document.getElementById('adminKey').value;
-  const body = {
-    chapter_id: document.getElementById('evChapter').value,
-    title:      document.getElementById('evTitle').value,
-    start_utc:  new Date(document.getElementById('evStart').value).toISOString(),
-    end_utc:    document.getElementById('evEnd').value ? new Date(document.getElementById('evEnd').value).toISOString() : null,
-    location:   document.getElementById('evLoc').value || null,
-    visibility: document.getElementById('evVis').value,
-    description:document.getElementById('evDesc').value || null,
-    status:     'Approved'
-  };
-  if (!body.title || !document.getElementById('evStart').value) { alert('Title and Start are required'); return; }
-  const res = await fetch('/api/admin/events', {
+async function uploadHistory(e){
+  e.preventDefault();
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  const fd = new FormData(document.getElementById('formHistory'));
+  const res = await fetch('/api/admin/history/import', {
     method:'POST',
-    headers:{'Content-Type':'application/json','x-admin-key':key},
-    body: JSON.stringify(body)
+    headers:{ 'x-admin-key': key },
+    body: fd
   });
-  document.getElementById('evOut').textContent = JSON.stringify(await res.json(), null, 2);
-};
+  const out = await res.json();
+  document.getElementById('resHistory').textContent = JSON.stringify(out, null, 2);
+  return false;
+}
+
+/* ---------- PIA UPLOAD (fixed + extra fields) ---------- */
+async function uploadPIA(e){
+  e.preventDefault();
+  const key = getKey(); if (!key) { alert('Enter admin key and click Save.'); return false; }
+
+  const fileInput = document.getElementById('piaFile');
+  const file = fileInput.files[0];
+  if (!file) { alert('Choose a file'); return false; }
+
+  const fd = new FormData();
+  // Primary name most servers expect:
+  fd.append('file', file);
+  // Backward-compat: if your server used to look for 'piaFile', this covers it.
+  fd.append('piaFile', file);
+
+  const res = await fetch('/api/admin/pia/import', {
+    method:'POST',
+    headers: { 'x-admin-key': key },  // DO NOT set Content-Type when sending FormData
+    body: fd
+  });
+
+  const ct = (res.headers.get('content-type') || '').toLowerCase();
+  let outStr = '';
+  try {
+    if (ct.includes('application/json')) {
+      const json = await res.json();
+      outStr = JSON.stringify(json, null, 2);
+    } else {
+      // Show raw text/HTML so you can see the server error message
+      outStr = await res.text();
+    }
+  } catch {
+    outStr = 'Server returned a non-JSON response (and could not be parsed).';
+  }
+
+  document.getElementById('resPIA').textContent = outStr;
+
+  if (!res.ok) {
+    // keep the text in the pre block, but also alert quickly
+    alert('PIA upload failed. See details below.');
+  }
+  return false;
+}
+
+async function uploadRoster(e){
+    e.preventDefault();
+    const key = getKey(); 
+    if (!key) { alert('Enter admin key and click Save.'); return false; }
+
+    const fd = new FormData(document.getElementById('formRoster'));
+    const res = await fetch('/api/admin/roster/import', {
+      method: 'POST',
+      headers: { 'x-admin-key': key },
+      body: fd
+    });
+
+    let out;
+    try { out = await res.json(); }
+    catch { out = { error: 'Server returned a non-JSON response.' }; }
+
+    document.getElementById('resRoster').textContent = JSON.stringify(out, null, 2);
+
+    if (!res.ok) {
+      alert(out?.error || 'Roster upload failed.');
+    }
+    return false;
+  }
+
+/* Save Chapter Profile */
+async function saveProfile(){
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  const payload = {
+    chapter_id: document.getElementById('cpChapter').value || null,
+    crest_url: document.getElementById('cpCrest').value || null,
+    president_name: document.getElementById('cpName').value || null,
+    president_email: document.getElementById('cpEmail').value || null,
+    president_photo_url: document.getElementById('cpPhoto').value || null
+  };
+  if (!payload.chapter_id) return alert('Select a chapter');
+
+  const res = await fetch('/api/admin/chapter-profile', {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-admin-key': key
+    },
+    body: JSON.stringify(payload)
+  });
+  const out = await res.json();
+  document.getElementById('resProfile').textContent = JSON.stringify(out, null, 2);
+}
+
+/* Toggle between File and Link mode */
+const modeFile = document.getElementById('modeFile');
+const modeLink = document.getElementById('modeLink');
+const fileRow = document.getElementById('fileRow');
+const linkRow = document.getElementById('linkRow');
+
+function refreshMode(){
+  const isFile = modeFile.checked;
+  fileRow.classList.toggle('d-none', !isFile);
+  linkRow.classList.toggle('d-none', isFile);
+}
+modeFile.addEventListener('change', refreshMode);
+modeLink.addEventListener('change', refreshMode);
+refreshMode();
+
+/* Save Resource: file OR link */
+async function saveResource(e){
+  e.preventDefault();
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  const form = document.getElementById('formDoc');
+
+  const common = {
+    title: form.title.value.trim(),
+    group: form.group.value.trim(),
+    doc_type: form.doc_type.value.trim() || '',
+    publish_date: form.publish_date.value || '',
+    visibility: form.visibility.value || 'public',
+    tags: form.tags.value.trim() || ''
+  };
+  if (!common.title || !common.group){
+    return alert('Please provide Title and Group.');
+  }
+
+  let res, out;
+  if (modeFile.checked){
+    const fd = new FormData();
+    Object.entries(common).forEach(([k,v])=> fd.append(k, v));
+    const file = form.file.files[0];
+    if (!file) return alert('Choose a file to upload.');
+    fd.append('file', file);
+
+    res = await fetch('/api/admin/documents/upload', {
+      method:'POST',
+      headers: { 'x-admin-key': key },
+      body: fd
+    });
+    out = await res.json();
+  } else {
+    const payload = { ...common, file_url: form.file_url.value.trim() };
+    if (!payload.file_url) return alert('Paste a File URL.');
+    res = await fetch('/api/admin/documents/upsert', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-admin-key': key
+      },
+      body: JSON.stringify(payload)
+    });
+    out = await res.json();
+  }
+
+  document.getElementById('resDoc').textContent = JSON.stringify(out, null, 2);
+  return false;
+}
+
+async function loadAdvisors(){
+  const cid = document.getElementById('cpChapter').value;
+  const tb = document.getElementById('advisorRows');
+  if (!cid){ tb.innerHTML = '<tr><td colspan="4" class="text-muted">Select a chapter...</td></tr>'; return; }
+  try{
+    const rows = await (await fetch(`/api/chapters/${cid}/advisors`)).json();
+    if (!Array.isArray(rows) || rows.length===0){
+      tb.innerHTML = '<tr><td colspan="4" class="text-muted">No advisors on file.</td></tr>';
+      return;
+    }
+    tb.innerHTML = '';
+    rows.forEach(a=>{
+      const tr = document.createElement('tr');
+      const photo = (a.photo_url && a.photo_url.trim()) ? a.photo_url.trim() : '/img/avatar-placeholder.png';
+      tr.innerHTML = `
+        <td class="fw-semibold">${a.name||'—'}</td>
+        <td class="small">${a.email?`<a href="mailto:${a.email}">${a.email}</a>`:'—'}${a.phone?` • ${a.phone}`:''}</td>
+        <td><img src="${photo}" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover" onerror="this.src='/img/avatar-placeholder.png'"></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteAdvisor('${a.id||''}')">Remove</button>
+        </td>`;
+      tb.appendChild(tr);
+    });
+  }catch(e){
+    tb.innerHTML = '<tr><td colspan="4" class="text-danger">Failed to load advisors.</td></tr>';
+  }
+}
+
+// Add advisor
+async function addAdvisor(){
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  const cid = document.getElementById('cpChapter').value;
+  if (!cid) return alert('Select a chapter');
+  const payload = {
+    chapter_id: cid,
+    name: document.getElementById('advName').value.trim(),
+    email: document.getElementById('advEmail').value.trim(),
+    phone: document.getElementById('advPhone').value.trim(),
+    photo_url: document.getElementById('advPhoto').value.trim()
+  };
+  if (!payload.name) return alert('Advisor name is required');
+
+  const res = await fetch('/api/admin/advisors/upsert', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-admin-key': key },
+    body: JSON.stringify(payload)
+  });
+  const out = await res.json().catch(()=>({}));
+  document.getElementById('resAdvisors').textContent = JSON.stringify(out, null, 2);
+  if (res.ok){
+    document.getElementById('advName').value='';
+    document.getElementById('advEmail').value='';
+    document.getElementById('advPhone').value='';
+    document.getElementById('advPhoto').value='';
+    loadAdvisors();
+  } else {
+    alert(out?.error || 'Failed to add advisor');
+  }
+}
+
+// Delete advisor
+async function deleteAdvisor(id){
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  if (!confirm('Remove this advisor?')) return;
+  const res = await fetch('/api/admin/advisors/delete', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-admin-key': key },
+    body: JSON.stringify({ id })
+  });
+  const out = await res.json().catch(()=>({}));
+  document.getElementById('resAdvisors').textContent = JSON.stringify(out, null, 2);
+  if (res.ok) loadAdvisors();
+}
+
+// When chapter dropdown changes, also refresh advisors
+const cpSel = document.getElementById('cpChapter');
+if (cpSel){
+  cpSel.addEventListener('change', ()=>{ loadAdvisors(); });
+}
+
+/* --------- Calendar Approvals UI ---------- */
+function fmtDT(dt){
+  const d = new Date(dt);
+  if (isNaN(d)) return dt;
+  const date = d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+  const time = d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+  return `${date} • ${time}`;
+}
+
+function flyerCell(url){
+  if (!url) return '<span class="text-muted">—</span>';
+  if (/\.(png|jpg|jpeg|gif)$/i.test(url)){
+    return `<img class="flyer-thumb" src="${url}" alt="Flyer">`;
+  }
+  return `<a href="${url}" target="_blank" rel="noopener">Open</a>`;
+}
+
+async function loadPending(){
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  const res = await fetch('/api/admin/calendar/pending', { headers: { 'x-admin-key': key }});
+  const rows = await res.json().catch(()=>[]);
+  const tb = document.getElementById('pendingBody');
+  tb.innerHTML = '';
+  if (!rows.length){
+    tb.innerHTML = '<tr><td colspan="6" class="text-muted">No pending events.</td></tr>';
+  } else {
+    rows.forEach(r=>{
+      const start = r.start_iso ? fmtDT(r.start_iso) : '—';
+      const end   = r.end_iso ? ' – ' + fmtDT(r.end_iso) : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <div class="fw-semibold">${r.title||'—'}</div>
+          <div class="small text-muted">${r.description||''}</div>
+        </td>
+        <td>${r.chapter_name || '—'}</td>
+        <td>${start}${end}</td>
+        <td>${r.location || '—'}</td>
+        <td>${flyerCell(r.flyer_url)}</td>
+        <td>
+          <div class="d-flex gap-1">
+            <button class="btn btn-success btn-sm" onclick="approveEvent('${r.id}')">Approve</button>
+            <button class="btn btn-outline-danger btn-sm" onclick="rejectEvent('${r.id}')">Reject</button>
+          </div>
+        </td>
+      `;
+      tb.appendChild(tr);
+    });
+  }
+  document.getElementById('pendingCount').textContent = `${rows.length} pending`;
+}
+
+async function approveEvent(id){
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  const res = await fetch('/api/admin/calendar/approve', {
+    method:'POST',
+    headers: { 'Content-Type':'application/json', 'x-admin-key': key },
+    body: JSON.stringify({ id })
+  });
+  const out = await res.json();
+  document.getElementById('resCalendar').textContent = JSON.stringify(out, null, 2);
+  loadPending();
+}
+
+async function rejectEvent(id){
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  const res = await fetch('/api/admin/calendar/reject', {
+    method:'POST',
+    headers: { 'Content-Type':'application/json', 'x-admin-key': key },
+    body: JSON.stringify({ id })
+  });
+  const out = await res.json();
+  document.getElementById('resCalendar').textContent = JSON.stringify(out, null, 2);
+  loadPending();
+}
+
+let __allDocs = [];
+
+function fmtDateShort(iso){
+  if (!iso) return '—';
+  const d = new Date(iso); if (isNaN(d)) return '—';
+  return d.toLocaleDateString();
+}
+
+function renderDocs(){
+  const q = (document.getElementById('docSearch').value || '').toLowerCase();
+  const g = (document.getElementById('docGroup').value || '').toLowerCase();
+  const tb = document.getElementById('docsBody');
+
+  const rows = __allDocs.filter(d=>{
+    const inGroup = !g || (String(d.group||'').toLowerCase() === g);
+    if (!inGroup) return false;
+    const hay = [
+      d.title, d.doc_type, d.tags, d.group
+    ].map(v=>String(v||'').toLowerCase()).join(' ');
+    return !q || hay.includes(q);
+  });
+
+  document.getElementById('docCount').textContent = `${rows.length} result${rows.length===1?'':'s'}`;
+
+  if (!rows.length){
+    tb.innerHTML = '<tr><td colspan="6" class="text-muted">No resources found.</td></tr>';
+    return;
+  }
+
+  tb.innerHTML = '';
+  rows
+    .sort((a,b)=> (b.publish_date||'').localeCompare(a.publish_date||''))
+    .forEach(d=>{
+      const tr = document.createElement('tr');
+      const href = d.file_url || '#';
+      tr.innerHTML = `
+        <td>
+          <div class="fw-semibold"><a href="${href}" target="_blank" rel="noopener">${d.title || 'Untitled'}</a></div>
+          <div class="small text-muted">${d.id ? `ID: ${d.id}` : ''}</div>
+        </td>
+        <td>${d.group || '—'}</td>
+        <td>${d.doc_type || '—'}</td>
+        <td>${d.tags || '—'}</td>
+        <td>${fmtDateShort(d.publish_date)}</td>
+        <td class="text-end">
+          <button class="btn btn-outline-danger btn-sm" onclick="deleteDoc('${d.id||''}')">Delete</button>
+        </td>
+      `;
+      tb.appendChild(tr);
+    });
+}
+
+async function loadDocs(){
+  try{
+    const res = await fetch('/api/documents');
+    __allDocs = await res.json();
+  }catch{
+    __allDocs = [];
+  }
+  renderDocs();
+}
+
+async function deleteDoc(id){
+  const key = getKey(); if (!key) return alert('Enter admin key and click Save.');
+  if (!id) return alert('Missing document id.');
+  if (!confirm('Delete this resource? This cannot be undone.')) return;
+
+  // If your backend uses a different path, adjust here:
+  const res = await fetch('/api/admin/documents/delete', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-admin-key': key },
+    body: JSON.stringify({ id })
+  });
+
+  const ct = (res.headers.get('content-type')||'').toLowerCase();
+  const out = ct.includes('json') ? await res.json() : await res.text();
+  document.getElementById('resDocs').textContent =
+    typeof out === 'string' ? out : JSON.stringify(out, null, 2);
+
+  if (res.ok){
+    // remove locally & re-render
+    __allDocs = __allDocs.filter(d => String(d.id) !== String(id));
+    renderDocs();
+  } else {
+    alert((out && out.error) || 'Delete failed.');
+  }
+}
+
+// live search
+document.addEventListener('input', (e)=>{
+  if (e.target && (e.target.id === 'docSearch' || e.target.id === 'docGroup')){
+    renderDocs();
+  }
+});
+
+// initial load
+loadDocs();
+
+loadPending();
 </script>
-</body></html>
+</body>
+</html>
