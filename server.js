@@ -562,6 +562,7 @@ app.get("/api/chapters/:id/alumni-roster", (req, res) => {
       currently_financial
     FROM alumni_members
     WHERE lower(trim(affiliated_chapter)) = lower(trim(?))
+    AND lower(trim(member_type)) != 'deceased alumni'
     ORDER BY full_name COLLATE NOCASE
   `).all(chapter.name || '');
 
