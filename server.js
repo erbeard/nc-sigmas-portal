@@ -374,6 +374,15 @@ function runMigrations(){
 }
 runMigrations();
 
+// --- helpers for case-insensitive "true"-ish text in SQLite
+const SQL_TRUE_SET = `('true','1','yes','y','x')`; // include 'x' just in case spreadsheet marks
+
+function whereCurrentlyFinancial(queryHasFilter) {
+  // If a filter is passed (e.g. currently_financial=True), enforce it; otherwise no WHERE clause
+  if (!queryHasFilter) return '';
+  return `WHERE LOWER(TRIM(COALESCE(currently_financial,''))) IN ${SQL_TRUE_SET}`;
+}
+
 /* ---------- UTILS ---------- */
 function norm(s){ return (s||"").toString().trim(); }
 function isBlankObj(o){ return !o || Object.values(o).every(v => norm(v)===""); }
@@ -719,6 +728,59 @@ app.get("/api/stats/active-brothers/growth-total", (req, res) => {
     pct
   });
 });
+
+/* ---------- Public: Aggregated DSC / JTF / Life Member counts ---------- */
+// GET /api/stats/alumni-members/honors?currently_financial=True
+app.get('/api/stats/alumni-members/honors', (req, res) => {
+  const hasFilter = typeof req.query.currently_financial !== 'undefined';
+  const whereCF = whereCurrentlyFinancial(hasFilter);
+
+  // Count DSC + JTF as true-ish, Life Member breakdown via LIKE
+  const row = db.prepare(`
+    SELECT
+      SUM(CASE WHEN LOWER(TRIM(COALESCE(dsc_member,'')))        IN ${SQL_TRUE_SET} THEN 1 ELSE 0 END) AS dsc,
+      SUM(CASE WHEN LOWER(TRIM(COALESCE(jt_floyd_hof_member,''))) IN ${SQL_TRUE_SET} THEN 1 ELSE 0 END) AS jtf,
+
+      SUM(CASE WHEN LOWER(TRIM(COALESCE(life_member_type,''))) LIKE '%gold%'     THEN 1 ELSE 0 END) AS life_gold,
+      SUM(CASE WHEN LOWER(TRIM(COALESCE(life_member_type,''))) LIKE '%sapphire%' THEN 1 ELSE 0 END) AS life_sapphire,
+      SUM(CASE WHEN LOWER(TRIM(COALESCE(life_member_type,''))) LIKE '%platinum%' THEN 1 ELSE 0 END) AS life_platinum
+    FROM alumni_members
+    ${whereCF}
+  `).get();
+
+  const life_total = (row?.life_gold || 0) + (row?.life_sapphire || 0) + (row?.life_platinum || 0);
+
+  res.json({
+    dsc: row?.dsc || 0,
+    jtf: row?.jtf || 0,
+    life_gold: row?.life_gold || 0,
+    life_sapphire: row?.life_sapphire || 0,
+    life_platinum: row?.life_platinum || 0,
+    life_total
+  });
+});
+
+/* ---------- Public: Raw alumni list (filtered) ---------- */
+// GET /api/alumni-members?currently_financial=True
+app.get('/api/alumni-members', (req, res) => {
+  const hasCF = typeof req.query.currently_financial !== 'undefined';
+  const whereCF = whereCurrentlyFinancial(hasCF);
+
+  // Keep it simple; limit to something sane
+  const rows = db.prepare(`
+    SELECT
+      member_number, full_name, email,
+      life_member_type, currently_financial,
+      dsc_member, jt_floyd_hof_member
+    FROM alumni_members
+    ${whereCF}
+    ORDER BY full_name COLLATE NOCASE
+    LIMIT 5000
+  `).all();
+
+  res.json(rows);
+});
+
 
 /* Top 5 by members added (growth) per type */
 app.get("/api/stats/top-growth", (req, res) => {
