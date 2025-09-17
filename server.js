@@ -9,6 +9,7 @@ const Database = require("better-sqlite3");
 const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
 require("dotenv").config();
+const { parse: parseCsvSync } = require("csv-parse/sync");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -188,6 +189,48 @@ FOR EACH ROW BEGIN
     SET updated_at = datetime('now')
     WHERE id = NEW.id;
 END;
+
+CREATE TABLE IF NOT EXISTS alumni_members (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_number TEXT UNIQUE,
+  full_name TEXT,
+  first_name TEXT,
+  last_name TEXT,
+  email TEXT,
+  affiliated_chapter TEXT,
+  affiliated_chapter_number TEXT,
+  affiliated_chapter_region TEXT,
+  affiliated_chapter_university TEXT,
+  initiated_chapter TEXT,
+  initiated_chapter_region TEXT,
+  initiated_chapter_university TEXT,
+  initiated_year INTEGER,
+  initiated_date TEXT,
+  member_type TEXT,
+  life_member_type TEXT,
+  currently_financial TEXT,
+  consecutive_dues TEXT,
+  financial_through INTEGER,
+  career_field_code TEXT,
+  career_field TEXT,
+  military_affiliation TEXT,   -- e.g., Army, Navy, None, Unknown
+  active_duty TEXT,            -- Yes/No/Unknown
+  last_rank_achieved TEXT,
+  former_sbc TEXT,
+  dsc_member TEXT,
+  dsc_number TEXT,
+  al_locke_scholar TEXT,
+  al_locke_scholar_number TEXT,
+  jt_floyd_hof_member TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_alumni_member_number ON alumni_members(member_number);
+CREATE INDEX IF NOT EXISTS idx_alumni_affiliated_chapter ON alumni_members(affiliated_chapter);
+CREATE INDEX IF NOT EXISTS idx_alumni_career_field ON alumni_members(career_field);
+CREATE INDEX IF NOT EXISTS idx_alumni_military ON alumni_members(military_affiliation);
+CREATE INDEX IF NOT EXISTS idx_alumni_active_duty ON alumni_members(active_duty);
 `);
 
 
@@ -392,6 +435,26 @@ function parseMoney(v){
   return isNaN(n) ? null : n;
 }
 
+/** Generic string cleaner */
+function cleanStr(v) {
+  if (v === undefined || v === null) return null;
+  const s = String(v).trim();
+  return s.length ? s : null;
+}
+/** Split "Full Name" -> { first, last } (very simple heuristic) */
+function splitName(full) {
+  if (!full) return { first: null, last: null };
+  const parts = String(full).trim().split(/\s+/);
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  return { first: parts.slice(0, -1).join(" "), last: parts.slice(-1)[0] };
+}
+function toInt(v) {
+  const s = (v == null ? "" : String(v)).replace(/\D+/g, "");
+  if (!s) return null;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 /* ---------- PAGE ROUTES ---------- */
 app.get("/chapter/:id", (req,res)=>{
   const file = path.join(__dirname, "public", "chapter.html");
@@ -413,6 +476,11 @@ app.get("/calendar", (req,res)=>{
   const file = path.join(__dirname, "public", "calendar.html");
   if (fs.existsSync(file)) return res.sendFile(file);
   res.status(404).send("calendar.html not found");
+});
+app.get("/network", (req,res)=>{
+  const file = path.join(__dirname, "public", "network.html");
+  if (fs.existsSync(file)) return res.sendFile(file);
+  res.status(404).send("network.html not found");
 });
 
 /* ---------- PUBLIC APIs (existing) ---------- */
@@ -458,6 +526,93 @@ app.get("/api/chapters/:id/active-latest", (req,res)=>{
     delta: (last.active_members||0) - (prev.active_members||0)
   });
 });
+
+/* ---------- Public: Alumni Network Search ---------- */
+// /api/network?q=&chapter=&industry=&military=&active_duty=&financial_through_gte=
+app.get("/api/network", (req, res) => {
+  const { q, chapter, industry, military, active_duty, financial_through_gte } = req.query;
+  const where = [];
+  const params = {};
+
+  if (q) { where.push(`(full_name LIKE @q OR email LIKE @q OR member_number LIKE @q OR career_field LIKE @q)`); params.q = `%${q}%`; }
+  if (chapter) { where.push(`affiliated_chapter = @chapter`); params.chapter = chapter; }
+  if (industry) { where.push(`career_field LIKE @industry`); params.industry = `%${industry}%`; }
+  if (military) { where.push(`military_affiliation LIKE @military`); params.military = `%${military}%`; }
+  if (active_duty) { where.push(`active_duty = @active_duty`); params.active_duty = active_duty; }
+  if (financial_through_gte) { where.push(`financial_through >= @ft`); params.ft = parseInt(financial_through_gte, 10); }
+
+  const sql = `
+    SELECT member_number, full_name, email, affiliated_chapter,
+           career_field, military_affiliation, active_duty,
+           financial_through, initiated_year
+    FROM alumni_members
+    ${where.length ? "WHERE " + where.join(" AND ") : ""}
+    ORDER BY full_name COLLATE NOCASE
+    LIMIT 500
+  `;
+  const rows = db.prepare(sql).all(params);
+  res.json(rows);
+});
+
+/* ---------- Network filter options ---------- */
+app.get("/api/network/options", (req, res) => {
+  try {
+    const careerFields = db.prepare(`
+      SELECT DISTINCT career_field AS v
+      FROM alumni_members
+      WHERE career_field IS NOT NULL AND TRIM(career_field) <> ''
+      ORDER BY v COLLATE NOCASE
+    `).all().map(r => r.v);
+
+    const affiliatedChapters = db.prepare(`
+      SELECT DISTINCT affiliated_chapter AS v
+      FROM alumni_members
+      WHERE affiliated_chapter IS NOT NULL AND TRIM(affiliated_chapter) <> ''
+      ORDER BY v COLLATE NOCASE
+    `).all().map(r => r.v);
+
+    res.json({ career_fields: careerFields, affiliated_chapters: affiliatedChapters });
+  } catch (e) {
+    console.error("[/api/network/options] error", e);
+    res.status(500).json({ error: "failed-options" });
+  }
+});
+
+/* ---------- Public: Alumni by Chapter (for chapter page) ---------- */
+app.get("/api/chapters/:id/alumni", (req, res) => {
+  // NOTE: If your :id is a chapter UUID, translate to chapter name first and match on affiliated_chapter.
+  // Many rosters store the "affiliated_chapter" as the NAME; if you have a mapping table, join on it instead.
+  const chapterIdentifier = req.params.id;
+
+  // Attempt: if :id is a UUID, map to chapter name; else treat as name directly
+  let chapterName = chapterIdentifier;
+  const found = db.prepare(`SELECT name FROM chapters WHERE id=?`).get(chapterIdentifier);
+  if (found && found.name) chapterName = found.name;
+
+  const rows = db.prepare(`
+    SELECT member_number, full_name, email, career_field, military_affiliation,
+           active_duty, financial_through, initiated_year
+    FROM alumni_members
+    WHERE affiliated_chapter = ?
+    ORDER BY full_name COLLATE NOCASE
+    LIMIT 1000
+  `).all(chapterName);
+
+  res.json(rows);
+});
+
+/* ---------- Public: Alumni counts by chapter (for Chapters list badges) ---------- */
+app.get("/api/alumni/counts-by-chapter", (req, res) => {
+  const rows = db.prepare(`
+    SELECT affiliated_chapter AS chapter, COUNT(*) AS count
+    FROM alumni_members
+    WHERE affiliated_chapter IS NOT NULL AND TRIM(affiliated_chapter) <> ''
+    GROUP BY affiliated_chapter
+    ORDER BY count DESC
+  `).all();
+  res.json(rows);
+});
+
 // Alumni chapter -> list of collegiate chapters they advise (with crest if available)
 app.get("/api/chapters/:id/advised-collegiate", (req, res) => {
   const alumniId = req.params.id;
@@ -1677,6 +1832,134 @@ app.post("/api/admin/roster/import", memoryUpload.single("rosterFile"), (req, re
     skipped,
     unknown_chapters: Array.from(unknownChapters)
   });
+});
+
+/* ---------- Admin: Alumni Roster (CSV) ---------- */
+app.post("/api/admin/alumni/import", memoryUpload.single("alumniFile"), (req, res) => {
+  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({ error: "Unauthorized" });
+  const f = req.file; if (!f) return res.status(400).json({ error: "Upload alumniFile (.csv)" });
+
+  // Try UTF-8 first, fall back to latin-1 if needed
+  let content = f.buffer.toString("utf8");
+  if (/�/.test(content)) {
+    try { content = f.buffer.toString("latin1"); } catch {}
+  }
+
+  let records;
+  try {
+    records = parseCsvSync(content, { columns: true, skip_empty_lines: true });
+  } catch (e) {
+    return res.status(400).json({ error: "Unable to parse CSV", detail: String(e.message || e) });
+  }
+
+  const upsert = db.prepare(`
+    INSERT INTO alumni_members (
+      member_number, full_name, first_name, last_name, email,
+      affiliated_chapter, affiliated_chapter_number, affiliated_chapter_region, affiliated_chapter_university,
+      initiated_chapter, initiated_chapter_region, initiated_chapter_university,
+      initiated_year, initiated_date, member_type, life_member_type, currently_financial,
+      consecutive_dues, financial_through, career_field_code, career_field,
+      military_affiliation, active_duty, last_rank_achieved, former_sbc, dsc_member,
+      dsc_number, al_locke_scholar, al_locke_scholar_number, jt_floyd_hof_member, updated_at
+    ) VALUES (
+      @member_number, @full_name, @first_name, @last_name, @email,
+      @affiliated_chapter, @affiliated_chapter_number, @affiliated_chapter_region, @affiliated_chapter_university,
+      @initiated_chapter, @initiated_chapter_region, @initiated_chapter_university,
+      @initiated_year, @initiated_date, @member_type, @life_member_type, @currently_financial,
+      @consecutive_dues, @financial_through, @career_field_code, @career_field,
+      @military_affiliation, @active_duty, @last_rank_achieved, @former_sbc, @dsc_member,
+      @dsc_number, @al_locke_scholar, @al_locke_scholar_number, @jt_floyd_hof_member, datetime('now')
+    )
+    ON CONFLICT(member_number) DO UPDATE SET
+      full_name = excluded.full_name,
+      first_name = excluded.first_name,
+      last_name = excluded.last_name,
+      email = excluded.email,
+      affiliated_chapter = excluded.affiliated_chapter,
+      affiliated_chapter_number = excluded.affiliated_chapter_number,
+      affiliated_chapter_region = excluded.affiliated_chapter_region,
+      affiliated_chapter_university = excluded.affiliated_chapter_university,
+      initiated_chapter = excluded.initiated_chapter,
+      initiated_chapter_region = excluded.initiated_chapter_region,
+      initiated_chapter_university = excluded.initiated_chapter_university,
+      initiated_year = excluded.initiated_year,
+      initiated_date = excluded.initiated_date,
+      member_type = excluded.member_type,
+      life_member_type = excluded.life_member_type,
+      currently_financial = excluded.currently_financial,
+      consecutive_dues = excluded.consecutive_dues,
+      financial_through = excluded.financial_through,
+      career_field_code = excluded.career_field_code,
+      career_field = excluded.career_field,
+      military_affiliation = excluded.military_affiliation,
+      active_duty = excluded.active_duty,
+      last_rank_achieved = excluded.last_rank_achieved,
+      former_sbc = excluded.former_sbc,
+      dsc_member = excluded.dsc_member,
+      dsc_number = excluded.dsc_number,
+      al_locke_scholar = excluded.al_locke_scholar,
+      al_locke_scholar_number = excluded.al_locke_scholar_number,
+      jt_floyd_hof_member = excluded.jt_floyd_hof_member,
+      updated_at = datetime('now')
+  `);
+
+  let inserted = 0, updated = 0, errors = 0;
+
+  const tx = db.transaction((rows) => {
+    for (const r of rows) {
+      const full_name = cleanStr(r["Full Name"]);
+      const nm = splitName(full_name);
+
+      const payload = {
+        member_number:            cleanStr(r["Member #"] || r["Member Number"]),
+        full_name,
+        first_name:               cleanStr(nm.first),
+        last_name:                cleanStr(nm.last),
+        email:                    cleanStr(r["Email"]),
+        affiliated_chapter:      cleanStr(r["Affiliated Chapter"]),
+        affiliated_chapter_number: cleanStr(r["Affiliated Chapter Number"]),
+        affiliated_chapter_region: cleanStr(r["Affiliated Chapter Region"]),
+        affiliated_chapter_university: cleanStr(r["Affiliated Chapter University/Location"]),
+        initiated_chapter:       cleanStr(r["Initiated Chapter"]),
+        initiated_chapter_region: cleanStr(r["Initiated Chapter Region"]),
+        initiated_chapter_university: cleanStr(r["Initiated Chapter University/Location"]),
+        initiated_year:          toInt(r["Initiated Year"]),
+        initiated_date:          cleanStr(r["Initiated Date"]),
+        member_type:             cleanStr(r["Member Type"]),
+        life_member_type:        cleanStr(r["Life Member Type"]),
+        currently_financial:     cleanStr(r["Currently Financial"]),
+        consecutive_dues:        cleanStr(r["Consecutive Dues"]),
+        financial_through:       toInt(r["Financial Through"]),
+        career_field_code:       cleanStr(r["Career Field Code"]),
+        career_field:            cleanStr(r["Career Field"]),
+        military_affiliation:    cleanStr(r["Military Affiliation"]),
+        active_duty:             cleanStr(r["Active Duty"]),
+        last_rank_achieved:      cleanStr(r["Last Rank Achieved"]),
+        former_sbc:              cleanStr(r["Former SBC"]),
+        dsc_member:              cleanStr(r["DSC Member"]),
+        dsc_number:              cleanStr(r["DSC Number"]),
+        al_locke_scholar:        cleanStr(r["AL Locke Scholar"]),
+        al_locke_scholar_number: cleanStr(r["AL Locke Scholar Number"]),
+        jt_floyd_hof_member:     cleanStr(r["JT Floyd HoF Member"])
+      };
+
+      if (!payload.member_number) { errors++; continue; }
+      const existed = db.prepare(`SELECT 1 FROM alumni_members WHERE member_number=?`).get(payload.member_number);
+      upsert.run(payload);
+      existed ? updated++ : inserted++;
+    }
+  });
+
+  try {
+    tx(records);
+  } catch (e) {
+    return res.status(500).json({ error: "DB upsert failed", detail: String(e.message || e) });
+  }
+
+  db.prepare(`INSERT INTO uploads (id,kind,occurred_at) VALUES (?,?,?)`)
+    .run(uuidv4(), "alumni_csv", new Date().toISOString());
+
+  return res.json({ ok: true, inserted, updated, errors, total: records.length });
 });
 
 /* Admin: update a member status (by internal member id) */

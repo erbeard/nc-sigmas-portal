@@ -25,6 +25,7 @@
       </a>
 
       <ul class="navbar-nav flex-row align-items-center gap-3">
+        <li class="nav-item"><a class="nav-link" href="/network.html">Network</a></li>
         <li class="nav-item"><a class="nav-link" href="/resources.html">Resources</a></li>
         <li class="nav-item"><a class="nav-link" href="/chapters.html">Chapters</a></li>
         <li class="nav-item dropdown">
@@ -166,6 +167,26 @@
   </div>
 </div>
 
+<!-- Alumni Roster CSV (Independent) -->
+<div class="col-lg-6">
+  <div class="card">
+    <div class="card-body">
+      <h5>Alumni Roster Import (CSV)</h5>
+      <p class="text-muted small mb-2">
+        Upload the CSV export (headers like <code>Member #</code>, <code>Full Name</code>, <code>Email</code>,
+        <code>Affiliated Chapter</code>, <code>Career Field</code>, <code>Military Affiliation</code>, <code>Active Duty</code>, etc.).
+        Members are upserted by <strong>Member #</strong>.
+      </p>
+      <form id="formAlumni" onsubmit="return uploadAlumni(event)">
+        <div class="mb-2">
+          <input class="form-control" type="file" name="alumniFile" accept=".csv" required>
+        </div>
+        <button class="btn btn-primary">Upload Alumni CSV</button>
+      </form>
+      <pre id="resAlumni" class="mt-2 small"></pre>
+    </div>
+  </div>
+</div>
 
     <!-- F. Chapter Profile -->
     <div class="col-lg-12">
@@ -469,6 +490,54 @@ async function uploadHistory(e){
   });
   const out = await res.json();
   document.getElementById('resHistory').textContent = JSON.stringify(out, null, 2);
+  return false;
+}
+
+async function uploadAlumni(e){
+  e.preventDefault();
+  const key = getKey();
+  if (!key) { alert('Enter admin key and click Save.'); return false; }
+
+  const form = document.getElementById('formAlumni');
+  const file = form.querySelector('input[name="alumniFile"]').files[0];
+  if (!file) { alert('Choose a CSV file'); return false; }
+
+  const fd = new FormData(form);
+
+  let res, bodyText = '', out;
+  try {
+    res = await fetch('/api/admin/alumni/import', {
+      method: 'POST',
+      headers: { 'x-admin-key': key }, // DO NOT set Content-Type for FormData
+      body: fd
+    });
+
+    const ct = (res.headers.get('content-type')||'').toLowerCase();
+    if (ct.includes('application/json')) {
+      out = await res.json();
+    } else {
+      bodyText = await res.text();
+      try { out = JSON.parse(bodyText); } catch { out = { raw: bodyText }; }
+    }
+
+    const debug = {
+      ok: res.ok,
+      status: res.status,
+      statusText: res.statusText,
+      headers: Object.fromEntries([...res.headers.entries()]),
+      response: out
+    };
+    document.getElementById('resAlumni').textContent = JSON.stringify(debug, null, 2);
+
+    if (!res.ok) {
+      alert(out?.error || `Upload failed (${res.status})`);
+    } else {
+      alert('Alumni CSV upload completed.');
+    }
+  } catch (err) {
+    document.getElementById('resAlumni').textContent = `Network/JS error: ${err?.message||err}`;
+    alert('Upload could not be completed (see details below).');
+  }
   return false;
 }
 

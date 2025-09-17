@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Network • NC Sigma Portal</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles/site.css">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-dark">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a class="navbar-brand d-flex align-items-center brand" href="/">
+      <img src="/img/nc-crest.png" alt="NC Crest" onerror="this.style.display='none'">
+      <span>NC Sigma Portal</span>
+    </a>
+    <ul class="navbar-nav flex-row align-items-center gap-3">
+      <li class="nav-item"><a class="nav-link" href="/network.html">Network</a></li>
+      <li class="nav-item"><a class="nav-link" href="/resources.html">Resources</a></li>
+      <li class="nav-item"><a class="nav-link" href="/chapters.html">Chapters</a></li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="confMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">Conferences</a>
+        <ul class="dropdown-menu" aria-labelledby="confMenu">
+          <li><a class="dropdown-item" href="https://www.zeffy.com/en-US/ticketing/2025-north-carolina-state-conference" target="_blank" rel="noopener noreferrer">2025 State Conference</a></li>
+          <li><span class="dropdown-item text-muted">2026 Regional Conference</span></li>
+        </ul>
+      </li>
+      <li class="nav-item"><a class="nav-link" href="/calendar">Calendar</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container py-4">
+  <div class="header mb-3">
+    <div class="fs-5 fw-semibold">Brother Network</div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label class="form-label">Search</label>
+          <input id="q" class="form-control" placeholder="Search name, email, member #">
+        </div>
+
+        <!-- Industry (Career Field) -->
+        <div class="col-md-4">
+          <label class="form-label">Industry (Career Field)</label>
+          <select id="industry" class="form-select">
+            <option value="">Any Industry</option>
+            <!-- populated by JS -->
+          </select>
+        </div>
+
+        <!-- Affiliated Chapter -->
+        <div class="col-md-4">
+          <label class="form-label">Affiliated Chapter</label>
+          <select id="affiliatedChapter" class="form-select">
+            <option value="">Any Chapter</option>
+            <!-- populated by JS -->
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Military</label>
+          <select id="military" class="form-select">
+            <option value="">Military (any)</option>
+            <option>Army</option>
+            <option>Navy</option>
+            <option>Air Force</option>
+            <option>Marines</option>
+            <option>Coast Guard</option>
+            <option>Space Force</option>
+            <option>National Guard</option>
+            <option>Reserves</option>
+          </select>
+        </div>
+
+        <div class="col-md-1">
+          <label class="form-label">Duty</label>
+          <select id="activeDuty" class="form-select">
+            <option value="">Duty</option>
+            <option>Yes</option>
+            <option>No</option>
+          </select>
+        </div>
+
+        <div class="col-12 d-flex gap-2 mt-2">
+          <button class="btn btn-primary" onclick="runSearch()">Search</button>
+          <button class="btn btn-outline-secondary" onclick="resetSearch()">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Chapter</th>
+          <th>Industry</th>
+          <th>Military</th>
+          <th>Active Duty</th>
+          <th>Financial Through</th>
+          <th>Initiated</th>
+        </tr>
+      </thead>
+      <tbody id="netBody">
+        <tr><td colspan="8" class="text-muted">Run a search to see results…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+<script>
+function esc(s){ return encodeURIComponent(s || ''); }
+
+// Populate dropdowns from DB (distinct values)
+async function loadNetworkOptions(){
+  try{
+    const res = await fetch('/api/network/options');
+    const { career_fields = [], affiliated_chapters = [] } = await res.json();
+
+    const selInd = document.getElementById('industry');
+    if (selInd){
+      // keep the first "Any Industry" option
+      selInd.length = 1;
+      career_fields.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        selInd.appendChild(opt);
+      });
+    }
+
+    const selChap = document.getElementById('affiliatedChapter');
+    if (selChap){
+      // keep the first "Any Chapter" option
+      selChap.length = 1;
+      affiliated_chapters.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        selChap.appendChild(opt);
+      });
+    }
+  } catch(e){
+    console.warn('Failed to load network options', e);
+  }
+}
+
+async function runSearch(){
+  const q          = document.getElementById('q').value;
+  const industry   = document.getElementById('industry').value;
+  const chapterVal = document.getElementById('affiliatedChapter').value; // fixed id
+  const military   = document.getElementById('military').value;
+  const activeDuty = document.getElementById('activeDuty').value;
+
+  // Keep parameter names the same as your existing /api/network handler
+  const url = `/api/network?q=${esc(q)}&industry=${esc(industry)}&chapter=${esc(chapterVal)}&military=${esc(military)}&active_duty=${esc(activeDuty)}`;
+  const res = await fetch(url);
+  const rows = await res.json().catch(()=>[]);
+  render(rows);
+}
+
+function resetSearch(){
+  document.getElementById('q').value = '';
+  document.getElementById('industry').value = '';
+  document.getElementById('affiliatedChapter').value = ''; // fixed id
+  document.getElementById('military').value = '';
+  document.getElementById('activeDuty').value = '';
+  document.getElementById('netBody').innerHTML =
+    '<tr><td colspan="8" class="text-muted">Run a search to see results…</td></tr>';
+}
+
+function render(rows){
+  const tb = document.getElementById('netBody');
+  if (!Array.isArray(rows) || !rows.length){
+    tb.innerHTML = '<tr><td colspan="8" class="text-muted">No results found.</td></tr>';
+    return;
+  }
+  tb.innerHTML = '';
+  rows.forEach(r=>{
+    const tr = document.createElement('tr');
+
+    // Military: show ONLY the value, blank if missing (no hyphen, no "—")
+    const mil = (r.military_affiliation || '').trim();
+
+    tr.innerHTML = `
+      <td>${r.full_name || '—'}</td>
+      <td>${r.email ? `<a href="mailto:${r.email}">${r.email}</a>` : '—'}</td>
+      <td>${r.affiliated_chapter || '—'}</td>
+      <td>${r.career_field || '—'}</td>
+      <td>${mil}</td>
+      <td>${r.active_duty || '—'}</td>
+      <td>${r.financial_through || '—'}</td>
+      <td>${r.initiated_year || '—'}</td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+// Initialize dropdowns on load
+loadNetworkOptions();
+</script>
+</body>
+</html>
