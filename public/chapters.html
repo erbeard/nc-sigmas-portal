@@ -130,6 +130,45 @@
     </div>
   </div>
 
+<div class="kpi-grid mb-3" id="honor-kpis" style="display:none">
+  <!-- DSC -->
+  <div class="kpi kpi-secondary kpi-col-3" style="position:relative">
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <div class="k-title">Distinguished Service Chapter</div>
+        <div id="kpi-dsc" class="k-num">—</div>
+      </div>
+      <img src="/img/dsc.png" alt="DSC" style="width:54px;height:54px;object-fit:contain;opacity:.9">
+    </div>
+    <div class="small" style="opacity:.9">Currently Financial</div>
+  </div>
+
+  <!-- James T. Floyd Hall of Fame -->
+  <div class="kpi kpi-tertiary kpi-col-3" style="position:relative">
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <div class="k-title">James T. Floyd Hall of Fame</div>
+        <div id="kpi-jtf" class="k-num">—</div>
+      </div>
+      <img src="/img/jtf.png" alt="JTF HOF" style="width:54px;height:54px;object-fit:contain;opacity:.9">
+    </div>
+    <div class="small" style="opacity:.9">Currently Financial</div>
+  </div>
+
+  <!-- Life Members (Total + breakdown) -->
+  <div class="kpi kpi-primary kpi-col-6" style="position:relative">
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <div class="k-title">Life Members</div>
+        <div id="kpi-life-total" class="k-num">—</div>
+      </div>
+      <img src="/img/life_member.png" alt="Life Member" style="width:64px;height:64px;object-fit:contain;opacity:.9">
+    </div>
+    <div class="small" id="kpi-life-breakdown" style="opacity:.9">Gold — • Sapphire — • Platinum —</div>
+    <div class="small">Currently Financial</div>
+  </div>
+</div>
+
   <!-- Filters -->
   <div class="row g-3 align-items-center mb-2">
     <div class="col-12">
@@ -753,6 +792,136 @@ function passesFilter(c){
   return true;
 }
 
+function boolTrue(v){
+  // Accept true / 'true' / 'TRUE' / 1 / '1' / 'yes'
+  if (typeof v === 'boolean') return v;
+  const s = String(v ?? '').trim().toLowerCase();
+  return s === 'true' || s === '1' || s === 'yes';
+}
+function lifeKey(v){
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s) return null;
+  // normalize common spellings
+  if (s.includes('gold')) return 'gold';
+  if (s.includes('sapphire')) return 'sapphire';
+  if (s.includes('platinum')) return 'platinum';
+  return null;
+}
+
+async function tryFetch(url){
+  try{
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  }catch(_e){ return null; }
+}
+
+/**
+ * Attempts several endpoints:
+ * - Aggregated counts (preferred)
+ * - Raw list fallback then compute here
+ *
+ * All counts require currently_financial === true.
+ */
+async function fetchHonorStats(){
+  // 1) Preferred: aggregated endpoints (try capital-T True first)
+  const aggUrls = [
+    '/api/stats/alumni-members/honors?currently_financial=True',
+    '/api/stats/alumni-members/honors?currently_financial=TRUE',
+    '/api/stats/alumni-members/honors?currently_financial=1',
+    '/api/stats/alumni-members/honors?currently_financial=yes',
+
+    '/api/stats/alumni/honors?currently_financial=True',
+    '/api/stats/alumni/honors?currently_financial=TRUE',
+    '/api/stats/alumni/honors?currently_financial=1',
+    '/api/stats/alumni/honors?currently_financial=yes',
+
+    '/api/alumni_members/honors/summary?currently_financial=True',
+    '/api/alumni_members/honors/summary?currently_financial=TRUE',
+    '/api/alumni_members/honors/summary?currently_financial=1',
+    '/api/alumni_members/honors/summary?currently_financial=yes'
+  ];
+  for (const u of aggUrls){
+    const d = await tryFetch(u);
+    if (d && (d.dsc != null || d.jtf != null || d.life_total != null || d.life?.total != null)){
+      return {
+        dsc: Number(d.dsc ?? d.dsc_member ?? d.dsc_count ?? 0),
+        jtf: Number(d.jtf ?? d.jt_floyd_hof_member ?? d.jtf_hof ?? d.jtf_count ?? 0),
+        life: {
+          gold: Number(d.life_gold ?? d.life?.gold ?? d.life_gold_count ?? 0),
+          sapphire: Number(d.life_sapphire ?? d.life?.sapphire ?? d.life_sapphire_count ?? 0),
+          platinum: Number(d.life_platinum ?? d.life?.platinum ?? d.life_platinum_count ?? 0),
+          total: Number(
+            d.life_total ?? d.life?.total ??
+            ((d.life_gold ?? d.life?.gold ?? 0) +
+             (d.life_sapphire ?? d.life?.sapphire ?? 0) +
+             (d.life_platinum ?? d.life?.platinum ?? 0))
+          )
+        }
+      };
+    }
+  }
+
+  // 2) Fallback: fetch raw list of currently-financial alumni members and compute
+  const rawUrls = [
+    '/api/alumni-members?currently_financial=True',
+    '/api/alumni_members?currently_financial=True',
+    '/api/alumni/members?currently_financial=True',
+
+    '/api/alumni-members?currently_financial=TRUE',
+    '/api/alumni_members?currently_financial=TRUE',
+    '/api/alumni/members?currently_financial=TRUE',
+
+    '/api/alumni-members?currently_financial=1',
+    '/api/alumni_members?currently_financial=1',
+    '/api/alumni/members?currently_financial=1'
+  ];
+  for (const u of rawUrls){
+    const arr = await tryFetch(u);
+    if (Array.isArray(arr)){
+      let dsc=0, jtf=0, gold=0, sapphire=0, platinum=0;
+      arr.forEach(m=>{
+        // enforce currently_financial on client side too
+        if (!boolTrue(m.currently_financial)) return;
+
+        if (boolTrue(m.dsc_member)) dsc++;
+        if (boolTrue(m.jt_floyd_hof_member) || boolTrue(m.jtf_member) || boolTrue(m.jtf_hof)) jtf++;
+
+        const lk = lifeKey(m.life_member_type);
+        if (lk === 'gold') gold++;
+        else if (lk === 'sapphire') sapphire++;
+        else if (lk === 'platinum') platinum++;
+      });
+      return { dsc, jtf, life: { gold, sapphire, platinum, total: gold + sapphire + platinum } };
+    }
+  }
+
+  // 3) If everything fails
+  return { dsc: 0, jtf: 0, life: { gold: 0, sapphire: 0, platinum: 0, total: 0 }, _error: true };
+}
+
+async function loadHonorKpis(){
+  const box = document.getElementById('honor-kpis');
+  const setNum = (id, v)=> { const el = document.getElementById(id); if (el) el.textContent = (v ?? 0).toLocaleString(); };
+
+  const stats = await fetchHonorStats();
+
+  setNum('kpi-dsc', stats.dsc);
+  setNum('kpi-jtf', stats.jtf);
+  setNum('kpi-life-total', stats.life?.total ?? 0);
+
+  const bd = document.getElementById('kpi-life-breakdown');
+  if (bd){
+    const g = stats.life?.gold ?? 0;
+    const s = stats.life?.sapphire ?? 0;
+    const p = stats.life?.platinum ?? 0;
+    bd.textContent = `Gold ${g.toLocaleString()} • Sapphire ${s.toLocaleString()} • Platinum ${p.toLocaleString()}`;
+  }
+
+  // Show the row (kept hidden until we have numbers)
+  if (box) box.style.display = 'grid';
+}
+
 // --- Level icons for Top 5 Membership (unchanged baseline icons) ---
 const LEVELS = {
   alumni: [
@@ -1103,6 +1272,7 @@ async function init(){
   renderMap(allChapters);
 
   await loadTotals();
+  await loadHonorKpis();
   await loadTop5Membership();
   await loadPiaTop();
   await loadTotalGrowth();
