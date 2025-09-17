@@ -536,6 +536,65 @@ app.get("/api/chapters/:id/active-latest", (req,res)=>{
   });
 });
 
+// GET /api/chapters/:id/alumni-roster (single, correct version)
+app.get("/api/chapters/:id/alumni-roster", (req, res) => {
+  const cid = req.params.id;
+
+  const chapter = db.prepare(`SELECT id, name, type FROM chapters WHERE id=?`).get(cid);
+  if (!chapter) return res.status(404).json({ error: "Unknown chapter" });
+
+  // Only for Alumni chapters
+  if (String(chapter.type || '').toLowerCase() !== 'alumni') {
+    return res.json({ rows: [] });
+  }
+
+  const rows = db.prepare(`
+    SELECT
+      member_number,
+      full_name,
+      email,
+      career_field,
+      military_affiliation,
+      active_duty,
+      financial_through,
+      initiated_year,
+      member_type,
+      currently_financial
+    FROM alumni_members
+    WHERE lower(trim(affiliated_chapter)) = lower(trim(?))
+    ORDER BY full_name COLLATE NOCASE
+  `).all(chapter.name || '');
+
+  const last4 = v => {
+    const s = v == null ? '' : String(v);
+    const m = s.match(/(\d{4})/);
+    return m ? m[1] : null;
+  };
+
+  const toBool = (v) => {
+    // handle booleans, ints, and common truthy strings
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'number') return v !== 0;
+    const s = String(v ?? '').trim().toLowerCase();
+    return ['true','t','yes','y','1','x'].includes(s);
+  };
+
+  res.json({
+    rows: rows.map(r => ({
+      name: r.full_name || null,
+      member_number: r.member_number || null,
+      email: r.email || null,
+      career_field: r.career_field || null,
+      military_affiliation: r.military_affiliation || null,
+      active_duty: r.active_duty || null,
+      financial_through: last4(r.financial_through),
+      initiated_year: r.initiated_year || null,
+      member_type: r.member_type || null,
+      currently_financial: toBool(r.currently_financial)
+    }))
+  });
+});
+
 /* ---------- Public: Alumni Network Search ---------- */
 // /api/network?q=&chapter=&industry=&military=&active_duty=&financial_through_gte=
 app.get("/api/network", (req, res) => {
@@ -648,24 +707,6 @@ app.get("/api/chapters/:id/advised-collegiate", (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load advised collegiate chapters" });
-  }
-});
-app.get('/api/chapters/:alumniId/pipeline', (req, res) => {
-  const alumniId = +req.params.alumniId;
-  try {
-    const rows = db.prepare(`
-      SELECT pt.member_number,
-             pt.from_collegiate_chapter_id,
-             pt.transferred_at,
-             c_from.name AS from_collegiate_name
-      FROM pipeline_transfers pt
-      LEFT JOIN chapters c_from ON c_from.id = pt.from_collegiate_chapter_id
-      WHERE pt.to_alumni_chapter_id = ? AND pt.status = 'transferred'
-      ORDER BY (pt.transferred_at IS NULL) ASC, pt.transferred_at DESC, pt.member_number
-    `).all(alumniId);
-    res.json({ rows });
-  } catch (e) {
-    res.status(500).json({ error: 'failed-alumni-pipeline' });
   }
 });
 app.get("/api/stats/yearly-last-upload", (req,res)=>{
@@ -1737,12 +1778,9 @@ app.post('/api/pipeline/transfer', (req, res) => {
   res.json({ ok: true });
 });
 
-
 /* Alumni page pipeline: show brothers assigned to this alumni chapter */
 app.get('/api/chapters/:alumniId/pipeline', (req, res) => {
-  const alumniId = +req.params.alumniId;
-  // You may want to join to a members table if available; here we rely on yearly roster views
-  // For display we’ll join against the latest roster row we can find by member_number
+  const alumniId = String(req.params.alumniId); // keep as text; ids in DB are TEXT
   try {
     const rows = db.prepare(`
       SELECT pt.member_number,
@@ -1752,7 +1790,7 @@ app.get('/api/chapters/:alumniId/pipeline', (req, res) => {
       FROM pipeline_transfers pt
       LEFT JOIN chapters c_from ON c_from.id = pt.from_collegiate_chapter_id
       WHERE pt.to_alumni_chapter_id = ? AND pt.status = 'transferred'
-      ORDER BY pt.transferred_at DESC NULLS LAST, pt.member_number
+      ORDER BY (pt.transferred_at IS NULL) ASC, pt.transferred_at DESC, pt.member_number
     `).all(alumniId);
     res.json({ rows });
   } catch (e) {

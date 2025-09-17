@@ -254,10 +254,14 @@
 
     <!-- ROSTER (Show/Hide + Pipeline + Editable Status) -->
     <div class="card mt-3" id="rosterCard">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <span class="section-title mb-0">Roster</span>
-        <button class="btn btn-sm btn-outline-primary" id="toggleRosterBtn">Hide</button>
-      </div>
+      <div class="card-header d-flex align-items-center justify-content-between gap-2">
+  <span class="section-title mb-0">Active Roster</span>
+  <div class="d-flex align-items-center gap-2">
+    <input id="alumniRosterSearch" class="form-control form-control-sm" placeholder="Filter roster…"
+           style="display:none; width:220px">
+    <button class="btn btn-sm btn-outline-primary" id="toggleRosterBtn">Hide</button>
+  </div>
+</div>
       <div class="card-body" id="rosterBody">
         <div class="table-responsive">
           <table class="table table-sm align-middle mb-3">
@@ -276,6 +280,27 @@
             </tbody>
           </table>
         </div>
+
+      <div class="card mt-3 d-none" id="reactivationCard">
+  <div class="card-header d-flex align-items-center justify-content-between gap-2">
+    <span class="section-title mb-0">Reactivation Opportunities</span>
+    <button class="btn btn-sm btn-outline-primary" id="toggleReactBtn">Hide</button>
+  </div>
+  <div class="card-body" id="reactBody">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr id="reactHeadRow">
+            <!-- will be set at runtime to match Alumni Roster -->
+          </tr>
+        </thead>
+        <tbody id="reactRows">
+          <tr><td colspan="5" class="text-muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
         <!-- Pipeline subsection -->
         <div id="pipelineSection" style="display:none;">
@@ -468,6 +493,16 @@ function renderSocialLinks(chapter){
   el.classList.add('social-links');
   el.innerHTML = links.length ? links.join('') : '<span class="text-muted">—</span>';
 }
+function setFiveColHeader(trEl){
+  if (!trEl) return;
+  trEl.innerHTML = `
+    <th data-key="name" class="cursor-pointer">Name</th>
+    <th data-key="member_number" class="cursor-pointer">Member #</th>
+    <th data-key="financial_through" class="cursor-pointer">Financial Through</th>
+    <th data-key="mip" class="cursor-pointer">MIP</th>
+    <th data-key="member_type" class="cursor-pointer">Member Type</th>
+  `;
+}
 
 /* --- Globals for cross-section checks --- */
 let LATEST_ACTIVE_TOTAL = 0;    // from history (Total Brothers)
@@ -546,6 +581,346 @@ function renderMipPie(rows){
   }
 
   maybeAddBadges(certifiedCount, activeCount);
+}
+
+/* --- Alumni roster helpers (display only) --- */
+function cleanMilitary(v){
+  const raw = (v || '').toString();
+  return raw.split('-')[0].trim(); // "Army - Retired" -> "Army"
+}
+
+function sortByKey(arr, key, dir){
+  const d = dir === 'desc' ? -1 : 1;
+  return arr.sort((a,b)=>{
+    const av = (a[key] ?? '').toString().toLowerCase();
+    const bv = (b[key] ?? '').toString().toLowerCase();
+    if (av < bv) return -1*d;
+    if (av > bv) return  1*d;
+    return 0;
+  });
+}
+
+function setAlumniRosterHeader(){
+  const mainHead = document.querySelector('#rosterBody thead tr');
+  setFiveColHeader(mainHead);
+  const reactHead = document.getElementById('reactHeadRow');
+  setFiveColHeader(reactHead);
+}
+
+function sortByKey(arr, key, dir){
+  const d = dir === 'desc' ? -1 : 1;
+  return arr.sort((a,b)=>{
+    const av = (a[key] ?? '').toString().toLowerCase();
+    const bv = (b[key] ?? '').toString().toLowerCase();
+    if (av < bv) return -1*d;
+    if (av > bv) return  1*d;
+    return 0;
+  });
+}
+
+function renderFiveColRows(tbody, rows){
+  tbody.innerHTML = '';
+  if (!rows.length){
+    tbody.innerHTML = '<tr><td colspan="5" class="text-muted">No members found.</td></tr>';
+    return;
+  }
+  rows.forEach(r=>{
+    const tr = document.createElement('tr');
+
+    const tdName = document.createElement('td');
+    tdName.textContent = r.name || '—';
+
+    const tdNum = document.createElement('td');
+    tdNum.textContent = r.member_number || '—';
+
+    const tdFin = document.createElement('td');
+    tdFin.textContent = r.financial_through || '—';
+
+    const tdMip = document.createElement('td');
+    tdMip.appendChild(renderMipBadge(r.member_number)); // uses your existing MIP JSON
+
+    const tdType = document.createElement('td');
+    tdType.textContent = r.member_type || '—';
+
+    tr.appendChild(tdName);
+    tr.appendChild(tdNum);
+    tr.appendChild(tdFin);
+    tr.appendChild(tdMip);
+    tr.appendChild(tdType);
+    tbody.appendChild(tr);
+  });
+}
+
+// State
+let __ALUMNI_FIN_BASE = [];   // currently_financial === true
+let __ALUMNI_NONFIN_BASE = []; // currently_financial === false
+let __ALUMNI_FIN_VIEW = [];
+let __ALUMNI_NONFIN_VIEW = [];
+let __ALUMNI_FIN_SORT = { key:'name', dir:'asc' };
+let __ALUMNI_NONFIN_SORT = { key:'name', dir:'asc' };
+
+function wireTableSorting(theadEl, getView, setView, sortState, tbodyEl){
+  if (!theadEl) return;
+  theadEl.addEventListener('click', e=>{
+    const th = e.target.closest('th[data-key]');
+    if (!th) return;
+    const key = th.getAttribute('data-key');
+    if (sortState.key === key){
+      sortState.dir = (sortState.dir === 'asc') ? 'desc' : 'asc';
+    } else {
+      sortState.key = key;
+      sortState.dir = 'asc';
+    }
+    const view = getView();
+    setView(sortByKey(view.slice(), sortState.key, sortState.dir));
+    renderFiveColRows(tbodyEl, getView());
+  });
+}
+
+function wireSharedFilter(inputEl){
+  if (!inputEl) return;
+  inputEl.addEventListener('input', ()=>{
+    const q = inputEl.value.trim().toLowerCase();
+    const hay = r => [
+      r.name, r.member_number, r.financial_through, r.member_type
+    ].map(v => String(v||'').toLowerCase()).join(' ');
+
+    // Financial view
+    const finFiltered = q ? __ALUMNI_FIN_BASE.filter(r=>hay(r).includes(q)) : __ALUMNI_FIN_BASE.slice();
+    __ALUMNI_FIN_VIEW = sortByKey(finFiltered, __ALUMNI_FIN_SORT.key, __ALUMNI_FIN_SORT.dir);
+    renderFiveColRows(document.getElementById('rosterRows'), __ALUMNI_FIN_VIEW);
+
+    // Non-financial view
+    const nfFiltered = q ? __ALUMNI_NONFIN_BASE.filter(r=>hay(r).includes(q)) : __ALUMNI_NONFIN_BASE.slice();
+    __ALUMNI_NONFIN_VIEW = sortByKey(nfFiltered, __ALUMNI_NONFIN_SORT.key, __ALUMNI_NONFIN_SORT.dir);
+    renderFiveColRows(document.getElementById('reactRows'), __ALUMNI_NONFIN_VIEW);
+  });
+}
+
+function initReactToggle(){
+  const btn = document.getElementById('toggleReactBtn');
+  const body = document.getElementById('reactBody');
+  if (!btn || !body) return;
+  btn.addEventListener('click', ()=>{
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? '' : 'none';
+    btn.textContent = isHidden ? 'Hide' : 'Show';
+  });
+}
+
+let __ALUMNI_BASE = [];   // full set from API
+let __ALUMNI_VIEW = [];   // filtered/sorted view
+let __ALUMNI_SORT = { key: 'name', dir: 'asc' };
+
+function renderAlumniRoster(rows){
+  const tb = document.getElementById('rosterRows');
+  if (!tb) return;
+
+  if (!rows.length){
+    tb.innerHTML = '<tr><td colspan="8" class="text-muted">No members found.</td></tr>';
+    return;
+  }
+
+  tb.innerHTML = '';
+  rows.forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.name || '—'}</td>
+      <td>${r.member_number || '—'}</td>
+      <td>${r.career_field || '—'}</td>
+      <td>${cleanMilitary(r.military_affiliation) || '—'}</td>
+      <td>${r.active_duty || '—'}</td>
+      <td>${r.financial_through || '—'}</td>
+      <td>${r.initiated_year || '—'}</td>
+      <td>${r.member_type || '—'}</td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+function wireAlumniSorting(){
+  const thead = document.querySelector('#rosterBody thead');
+  if (!thead) return;
+  thead.addEventListener('click', e=>{
+    const th = e.target.closest('th[data-key]');
+    if (!th) return;
+    const key = th.getAttribute('data-key');
+    if (__ALUMNI_SORT.key === key){
+      __ALUMNI_SORT.dir = (__ALUMNI_SORT.dir === 'asc') ? 'desc' : 'asc';
+    } else {
+      __ALUMNI_SORT.key = key;
+      __ALUMNI_SORT.dir = 'asc';
+    }
+    __ALUMNI_VIEW = sortByKey(__ALUMNI_VIEW, __ALUMNI_SORT.key, __ALUMNI_SORT.dir);
+    renderAlumniRoster(__ALUMNI_VIEW);
+  });
+}
+
+function wireAlumniFilter(){
+  const box = document.getElementById('alumniRosterSearch');
+  if (!box) return;
+  box.addEventListener('input', ()=>{
+    const q = box.value.trim().toLowerCase();
+    if (!q){
+      __ALUMNI_VIEW = sortByKey(__ALUMNI_BASE.slice(), __ALUMNI_SORT.key, __ALUMNI_SORT.dir);
+      return renderAlumniRoster(__ALUMNI_VIEW);
+    }
+    const hay = r => [
+      r.name, r.member_number, r.career_field, r.military_affiliation,
+      r.active_duty, r.financial_through, r.initiated_year, r.member_type
+    ].map(v => String(v||'').toLowerCase()).join(' ');
+    const filtered = __ALUMNI_BASE.filter(r => hay(r).includes(q));
+    __ALUMNI_VIEW = sortByKey(filtered, __ALUMNI_SORT.key, __ALUMNI_SORT.dir);
+    renderAlumniRoster(__ALUMNI_VIEW);
+  });
+}
+
+function toBool(v){
+  if (typeof v === 'boolean') return v;
+  if (v == null) return false;
+  const s = String(v).trim().toLowerCase();
+  if (['true','t','yes','y','1'].includes(s)) return true;
+  if (['false','f','no','n','0',''].includes(s)) return false;
+  return Boolean(v); // fallback
+}
+
+function last4Digits(v){
+  const m = String(v ?? '').match(/(\d{4})(?!.*\d)/) || String(v ?? '').match(/(\d{4})/);
+  return m ? m[1] : '';
+}
+
+/* Load & render Alumni roster from /api/chapters/:id/alumni-roster */
+async function loadAlumniRosterAndRender(chapterId){
+  await loadMipIndexOnce();
+  setAlumniRosterHeader();
+  const sb = document.getElementById('alumniRosterSearch');
+  if (sb) sb.style.display = '';
+
+  // 1) Try multiple endpoints
+  const endpoints = [
+    `/api/chapters/${chapterId}/alumni-roster`,
+    `/api/chapters/${chapterId}/alumni_roster`,
+    `/api/chapters/${chapterId}/alumni-members`,
+    `/api/chapters/${chapterId}/alumni_members`,
+    `/api/chapters/${chapterId}/members?type=alumni`,
+    `/api/chapters/${chapterId}/roster?scope=alumni`
+  ];
+
+  let raw = [];
+  let lastErr = null;
+
+  for (const url of endpoints){
+    try{
+      const res = await fetch(url, { cache:'no-store' });
+      if (!res.ok) { lastErr = new Error(`HTTP ${res.status} @ ${url}`); continue; }
+      const json = await res.json();
+
+      // 2) Normalize common shapes
+      raw =
+          (Array.isArray(json) ? json : null) ||
+          (Array.isArray(json?.rows) ? json.rows : null) ||
+          (Array.isArray(json?.data) ? json.data : null) ||
+          (Array.isArray(json?.data?.rows) ? json.data.rows : null) ||
+          [];
+      if (raw.length || (json && (json.rows || json.data))) {
+        console.info('[alumni-roster] loaded from', url, { count: raw.length, sample: raw[0] });
+        break;
+      }
+    }catch(e){
+      lastErr = e;
+    }
+  }
+
+  if (!Array.isArray(raw)) raw = [];
+  if (!raw.length && lastErr) {
+    console.warn('[alumni-roster] no data; last error:', lastErr);
+  }
+  if (!raw.length){
+    // Render explicit empty states so you can SEE it’s the fetch, not the table code.
+    renderFiveColRows(document.getElementById('rosterRows'), []);
+    const reactCard = document.getElementById('reactivationCard');
+    reactCard?.classList.add('d-none');
+    // keep the shared filter wired so you can try again without reload
+    wireSharedFilter(sb);
+    return;
+  }
+
+  // 3) Field mappers
+  const toBool = (v)=>{
+    if (typeof v === 'boolean') return v;
+    if (v == null) return false;
+    const s = String(v).trim().toLowerCase();
+    if (['true','t','yes','y','1','current','financial'].includes(s)) return true;
+    if (['false','f','no','n','0','not current','non-financial','nonfinancial'].includes(s)) return false;
+    return Boolean(v);
+  };
+  const last4 = (v)=>{
+    const m = String(v ?? '').match(/(\d{4})(?!.*\d)/) || String(v ?? '').match(/(\d{4})/);
+    return m ? m[1] : '';
+  };
+  const full = (r)=>{
+    const n = r.name || r.full_name || r.FullName || '';
+    if (n) return n;
+    return [r.first_name || r.FirstName, r.last_name || r.LastName].filter(Boolean).join(' ');
+  };
+
+  // 4) Map backend → UI row
+  const rows = raw.map(r => ({
+    name: full(r) || '',
+    member_number: r.member_number ?? r.MemberNumber ?? r.memberNumber ?? r.member_id ?? r.MemberID ?? r.id ?? '',
+    financial_through: last4(
+      r.financial_through ?? r.financialThrough ?? r.financial_thru ??
+      r.financial_through_date ?? r.financialThroughDate ?? r.FinancialThrough
+    ),
+    member_type:
+      r.member_type ?? r.MemberType ?? r.status ?? r.Status ?? r.type ?? r.Type ?? '',
+    currently_financial: toBool(
+      r.currently_financial ?? r.CurrentlyFinancial ?? r.currentFinancial ??
+      r.financial ?? r.is_current ?? r.IsCurrent ?? r.current
+    )
+  }));
+
+  // 5) Split & render
+  __ALUMNI_FIN_BASE    = rows.filter(r => r.currently_financial);
+  __ALUMNI_NONFIN_BASE = rows.filter(r => !r.currently_financial);
+
+  // Roster (financial)
+  __ALUMNI_FIN_VIEW = sortByKey(__ALUMNI_FIN_BASE.slice(), __ALUMNI_FIN_SORT.key, __ALUMNI_FIN_SORT.dir);
+  renderFiveColRows(document.getElementById('rosterRows'), __ALUMNI_FIN_VIEW);
+
+  // Reactivation
+  const reactCard = document.getElementById('reactivationCard');
+  if (__ALUMNI_NONFIN_BASE.length){
+    reactCard.classList.remove('d-none');
+    __ALUMNI_NONFIN_VIEW = sortByKey(__ALUMNI_NONFIN_BASE.slice(), __ALUMNI_NONFIN_SORT.key, __ALUMNI_NONFIN_SORT.dir);
+    renderFiveColRows(document.getElementById('reactRows'), __ALUMNI_NONFIN_VIEW);
+    initReactToggle();
+  } else {
+    reactCard.classList.add('d-none');
+  }
+
+  // Sorting
+  wireTableSorting(
+    document.querySelector('#rosterBody thead'),
+    ()=>__ALUMNI_FIN_VIEW,
+    v=>{ __ALUMNI_FIN_VIEW = v; },
+    __ALUMNI_FIN_SORT,
+    document.getElementById('rosterRows')
+  );
+  wireTableSorting(
+    document.getElementById('reactHeadRow')?.parentElement,
+    ()=>__ALUMNI_NONFIN_VIEW,
+    v=>{ __ALUMNI_NONFIN_VIEW = v; },
+    __ALUMNI_NONFIN_SORT,
+    document.getElementById('reactRows')
+  );
+
+  // Shared filter across both tables
+  wireSharedFilter(sb);
+
+  // MIP donut based on financial subset
+  const pseudoForMip = __ALUMNI_FIN_BASE.map(r => ({ member_number: r.member_number, status: 'Active' }));
+  renderMipPie(pseudoForMip);
 }
 
 /* Render Graduated → Alumni placement pie (Placed vs Unplaced) */
@@ -1411,6 +1786,8 @@ if (isAlumni) {
       data: { labels, datasets: [{ label: 'Active Members (year-end)', data: values }] }
     });
 
+    
+
     // ---- PIA summary ----
     const pia = await (await fetch(`/api/chapters/${id}/pia/summary`)).json();
     document.getElementById('piaAsOf').textContent = fmtAsOf(pia?.as_of);
@@ -1435,18 +1812,31 @@ if (isAlumni) {
     document.getElementById('tile-social').onclick    = () => showPiaDetails(id, 'social', 'tile-social');
     document.getElementById('tile-education').onclick = () => showPiaDetails(id, 'education', 'tile-education');
     document.getElementById('tile-sbc').onclick       = () => showPiaDetails(id, 'sbc', 'tile-sbc');
-    document.getElementById('piaCloseBtn').onclick    = () => { openProgram = null; document.getElementById('piaDetailsCard').style.display = 'none'; setActiveTile(null); };
-
+    document.getElementById('piaCloseBtn').onclick    = () => { openProgram = null; document.getElementById('piaDetailsCard').style.display = 'none'; setActiveTile(null); };  
+   
     // ---- Roster (always renders; Alumni pipeline will be overwritten next) ----
     initRosterToggle();
-    try {
-      const roster = await (await fetch(`/api/chapters/${id}/roster`)).json();
-      renderRoster(Array.isArray(roster) ? roster : [], id);
-    } catch (e) {
-      document.getElementById('rosterRows').innerHTML = '<tr><td colspan="6" class="text-danger">Failed to load roster.</td></tr>';
-      const campusTotal = document.getElementById('campusTotal');
-      if (campusTotal) campusTotal.textContent = '—';
-    }
+
+if (isAlumni) {
+  // Alumni: use alumni_members + new columns (sortable/filterable)
+  try {
+    await loadAlumniRosterAndRender(id);
+  } catch (e) {
+    document.getElementById('rosterRows').innerHTML =
+      '<tr><td colspan="8" class="text-danger">Failed to load alumni roster.</td></tr>';
+  }
+} else {
+  // Collegiate: keep your existing behavior (editable status, pipeline, etc.)
+  try {
+    const roster = await (await fetch(`/api/chapters/${id}/roster`)).json();
+    renderRoster(Array.isArray(roster) ? roster : [], id);
+  } catch (e) {
+    document.getElementById('rosterRows').innerHTML =
+      '<tr><td colspan="6" class="text-danger">Failed to load roster.</td></tr>';
+    const campusTotal = document.getElementById('campusTotal');
+    if (campusTotal) campusTotal.textContent = '—';
+  }
+}
 
     // ---- Alumni-only: overwrite pipeline table + success pie with ADVISORY aggregate ----
     if (isAlumni) {
