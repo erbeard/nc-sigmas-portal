@@ -566,10 +566,11 @@ app.get("/api/chapters/:id/alumni-roster", (req, res) => {
     ORDER BY full_name COLLATE NOCASE
   `).all(chapter.name || '');
 
-  const last4 = v => {
-    const s = v == null ? '' : String(v);
-    const m = s.match(/(\d{4})/);
-    return m ? m[1] : null;
+  // robust: keep digits only, then take the last 4 if present
+function last4(v) {
+  const digits = (v == null ? '' : String(v)).replace(/\D+/g, '');
+  if (!digits) return null;
+  return digits.length >= 4 ? digits.slice(-4) : digits; // e.g., "12311997" -> "1997"
   };
 
   const toBool = (v) => {
