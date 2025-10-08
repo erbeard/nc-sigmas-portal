@@ -1789,27 +1789,113 @@ async function guessTakenAtFromFile(file){
   return new Date().toISOString();
 }
 
-/* Upload one file (multipart/form-data) with optional taken_at */
+/* --- Resilient gallery uploads (handles presigned or direct) --- */
+
+/* Probe server for a supported upload route/shape */
+async function discoverGalleryUpload(chapterId){
+  const key = getAdminKey();
+
+  // Try presign endpoints first
+  const presignCandidates = [
+    `/api/chapters/${chapterId}/media/presign`,
+    `/api/chapters/${chapterId}/photos/presign`,
+    `/api/media/presign?chapter_id=${encodeURIComponent(chapterId)}`
+  ];
+  for (const url of presignCandidates){
+    try{
+      const r = await fetch(url, { method:'POST', headers:{ 'x-admin-key': key || '' } });
+      if (r.ok) return { mode:'presign', url };
+    }catch(_) {}
+  }
+
+  // Try direct multipart endpoints (existence via OPTIONS/GET/405)
+  const directCandidates = [
+    { url: `/api/chapters/${chapterId}/media`,  fieldNames:['file','image','photo'] },
+    { url: `/api/chapters/${chapterId}/photos`, fieldNames:['file','image','photo'] },
+    { url: `/api/media?chapter_id=${encodeURIComponent(chapterId)}`, fieldNames:['file','image','photo'] }
+  ];
+  for (const c of directCandidates){
+    try{
+      const probe = await fetch(c.url, { method:'OPTIONS' }).catch(()=>null);
+      if (probe && (probe.ok || probe.status === 204)) return { mode:'direct', ...c };
+      const head = await fetch(c.url, { method:'GET' }).catch(()=>null);
+      if (head && (head.ok || head.status === 405)) return { mode:'direct', ...c };
+    }catch(_) {}
+  }
+
+  return null;
+}
+
+/* Upload via presigned flow (S3/GCS) */
+async function uploadViaPresign(chapterId, file, takenAt, presignUrl){
+  const key = getAdminKey();
+  const presignRes = await fetch(presignUrl, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'x-admin-key': key || '' },
+    body: JSON.stringify({ filename: file.name, content_type: file.type || 'image/jpeg', taken_at: takenAt })
+  });
+  if (!presignRes.ok){
+    const t = await presignRes.text().catch(()=> '');
+    throw new Error(t || 'Could not get upload URL');
+  }
+  const presign = await presignRes.json();
+  const uploadUrl = presign.upload_url || presign.url;
+  const publicUrl = presign.public_url || presign.publicUrl || null;
+  const method    = (presign.method || '').toUpperCase();
+
+  if (!uploadUrl) throw new Error('Presign response missing upload URL');
+
+  if (presign.fields && typeof presign.fields === 'object'){
+    // S3 form POST
+    const form = new FormData();
+    Object.entries(presign.fields).forEach(([k,v])=> form.append(k, v));
+    form.append('file', file);
+    const up = await fetch(uploadUrl, { method:'POST', body: form });
+    if (!up.ok) throw new Error('Storage upload failed');
+    return { ok:true, publicUrl };
+  }
+
+  // PUT-binary presign
+  const up = await fetch(uploadUrl, { method: method || 'PUT', headers:{ 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+  if (!up.ok) throw new Error('Storage upload failed');
+  return { ok:true, publicUrl };
+}
+
+/* Upload via direct multipart to API */
+async function uploadViaDirect(chapterId, file, takenAt, url, fieldNames){
+  const key = getAdminKey();
+  const fd = new FormData();
+  const names = fieldNames && fieldNames.length ? fieldNames : ['file','image','photo'];
+  fd.append(names[0], file);
+  fd.append('taken_at', takenAt);
+
+  const res = await fetch(url, { method:'POST', headers:{ 'x-admin-key': key || '' }, body: fd });
+  if (!res.ok){
+    const t = await res.text().catch(()=> '');
+    if (t && /<\/?[a-z][\s\S]*>/i.test(t)){ // clean HTML error like "Cannot POST /…"
+      const clean = t.replace(/<[^>]*>/g,'').trim();
+      throw new Error(clean || 'Upload failed');
+    }
+    throw new Error(t || 'Upload failed');
+  }
+  return res.json().catch(()=>({ ok:true }));
+}
+
+/* PUBLIC: used by gallery code */
 async function uploadOnePhoto(chapterId, file){
-  // Require admin key (same pattern you use elsewhere)
   const key = getAdminKey();
   if (!key){ alert('Admin key required. Go to Admin and save your key first.'); throw new Error('missing-admin-key'); }
 
   const takenAt = await guessTakenAtFromFile(file);
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('taken_at', takenAt); // let backend trust this if allowed
-
-  const res = await fetch(`/api/chapters/${chapterId}/media`, {
-    method: 'POST',
-    headers: { 'x-admin-key': key }, // no content-type, browser sets boundary
-    body: fd
-  });
-  if(!res.ok){
-    const t = await res.text().catch(()=> '');
-    throw new Error(t || 'Upload failed');
+  const discovered = await discoverGalleryUpload(chapterId);
+  if (!discovered){
+    throw new Error('No upload endpoint found (tried presign and direct). Add /media or /media/presign.');
   }
-  return res.json();
+  if (discovered.mode === 'presign'){
+    return uploadViaPresign(chapterId, file, takenAt, discovered.url);
+  } else {
+    return uploadViaDirect(chapterId, file, takenAt, discovered.url, discovered.fieldNames);
+  }
 }
 
 /* Load gallery list from backend */

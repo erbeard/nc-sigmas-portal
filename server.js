@@ -190,6 +190,16 @@ FOR EACH ROW BEGIN
     WHERE id = NEW.id;
 END;
 
+CREATE TABLE IF NOT EXISTS chapter_photos (
+  id TEXT PRIMARY KEY,
+  chapter_id TEXT NOT NULL,
+  url TEXT NOT NULL,
+  taken_at TEXT,
+  uploaded_at TEXT NOT NULL,
+  FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_chapter_photos_chapter ON chapter_photos(chapter_id, uploaded_at DESC);
+
 CREATE TABLE IF NOT EXISTS alumni_members (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   member_number TEXT UNIQUE,
@@ -395,6 +405,26 @@ function runMigrations(){
   }
 }
 runMigrations();
+
+// ---- Chapter Photos (disk) ----
+const chapterPhotosBase = path.join(__dirname, "public", "uploads", "chapters");
+fs.mkdirSync(chapterPhotosBase, { recursive: true });
+
+const chapterPhotoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const chapterId = String(req.params.id || "").trim();
+    if (!chapterId) return cb(new Error("missing chapter id"));
+    const dest = path.join(chapterPhotosBase, chapterId);
+    fs.mkdirSync(dest, { recursive: true });
+    cb(null, dest);
+  },
+  filename: (_req, file, cb) => {
+    const base = slugify(path.parse(file.originalname).name);
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+    cb(null, `${Date.now()}-${base}${ext}`);
+  }
+});
+const chapterPhotoUpload = multer({ storage: chapterPhotoStorage });
 
 // --- helpers for case-insensitive "true"-ish text in SQLite
 const SQL_TRUE_SET = `('true','1','yes','y','x')`; // include 'x' just in case spreadsheet marks
@@ -900,6 +930,61 @@ app.get("/api/stats/top-growth", (req, res) => {
 
   res.json({ year: yNow, prev_year: yPrev, rows });
 });
+
+/* -------- Chapter Media (list + upload) -------- */
+
+// List photos for a chapter
+app.get("/api/chapters/:id/media", (req, res) => {
+  const cid = String(req.params.id || "").trim();
+  const rows = db.prepare(`
+    SELECT id, url, taken_at, uploaded_at
+    FROM chapter_photos
+    WHERE chapter_id=?
+    ORDER BY uploaded_at DESC
+  `).all(cid);
+  res.json(rows.map(r => ({
+    id: r.id,
+    url: r.url,               // public URL under /uploads/chapters/<id>/<file>
+    taken_at: r.taken_at,
+    uploaded_at: r.uploaded_at
+  })));
+});
+
+// Upload a photo for a chapter (requires x-admin-key)
+app.post("/api/chapters/:id/media",
+  (req, res, next) => {
+    if (req.get("x-admin-key") !== ADMIN_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+  },
+  chapterPhotoUpload.single("file"),
+  (req, res) => {
+    const cid = String(req.params.id || "").trim();
+    if (!cid) return res.status(400).json({ error: "missing chapter id" });
+    if (!req.file) return res.status(400).json({ error: "missing file" });
+
+    // Build public URL
+    const relUrl = `/uploads/chapters/${cid}/${req.file.filename}`;
+
+    // Optional EXIF/metadata date coming from the client
+    let taken_at = (req.body.taken_at || "").trim() || null;
+    if (taken_at) {
+      const d = new Date(taken_at);
+      taken_at = isNaN(d) ? null : d.toISOString();
+    }
+
+    const id = uuidv4();
+    const uploaded_at = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO chapter_photos (id, chapter_id, url, taken_at, uploaded_at)
+      VALUES (?,?,?,?,?)
+    `).run(id, cid, relUrl, taken_at, uploaded_at);
+
+    res.json({ ok: true, id, url: relUrl, taken_at, uploaded_at });
+  }
+);
 
 /* Statewide PIA financial totals (scholarships + Black-owned spend) */
 app.get("/api/stats/pia/financial-totals", (req, res) => {
