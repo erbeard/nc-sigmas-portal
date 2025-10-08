@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Support • PBSNC Portal</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/styles/site.css">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --royal:#0b2b7e; --royal2:#0d3aa8; --sky:#3b82f6; --sky2:#60a5fa; }
+  .page-title{font-family:'Montserrat',system-ui; font-weight:900; letter-spacing:.2px;}
+  .hero{background:linear-gradient(135deg,var(--royal) 0%, var(--royal2) 100%); border-radius:18px; color:#fff; padding:1.25rem 1.5rem;}
+  .hero .lead{opacity:.95}
+  .card-help{border-radius:12px}
+</style>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-dark">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a class="navbar-brand d-flex align-items-center brand" href="/">
+      <img src="/img/nc-crest.png" alt="NC Crest" onerror="this.style.display='none'">
+      <span>PBSNC Portal</span>
+    </a>
+    <ul class="navbar-nav flex-row align-items-center gap-3">
+      <li class="nav-item"><a class="nav-link" href="/network.html">Network</a></li>
+      <li class="nav-item"><a class="nav-link" href="/resources.html">Resources</a></li>
+      <li class="nav-item"><a class="nav-link" href="/chapters.html">Chapters</a></li>
+      <li class="nav-item"><a class="nav-link" href="/calendar">Calendar</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+      <li class="nav-item"><a class="nav-link active" href="/support">Support</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container py-4">
+  <div class="hero mb-3">
+    <h1 class="page-title h3 mb-2">Support & Feedback</h1>
+    <p class="lead mb-0">Found a bug, have an idea, or need help? Send it here—let’s improve the PBSNC Portal together.</p>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card card-help">
+        <div class="card-body">
+          <h5 class="mb-3">Submit a Ticket</h5>
+
+          <form id="supportForm" class="needs-validation" novalidate>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label">Name</label>
+                <input class="form-control" name="name" placeholder="Optional">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" name="email" placeholder="Optional">
+              </div>
+            </div>
+
+            <div class="row g-2 mt-1">
+              <div class="col-md-6">
+                <label class="form-label">Chapter</label>
+                <select class="form-select" name="chapter_id" id="chapterSelect">
+                  <option value="">Select chapter (optional)</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Type</label>
+                <select class="form-select" name="type" required>
+                  <option value="issue">Issue / Bug</option>
+                  <option value="suggestion">Suggestion</option>
+                  <option value="question">Question</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mt-2">
+              <label class="form-label">Subject <span class="text-danger">*</span></label>
+              <input class="form-control" name="subject" required>
+              <div class="invalid-feedback">Subject is required.</div>
+            </div>
+
+            <div class="mt-2">
+              <label class="form-label">Description <span class="text-danger">*</span></label>
+              <textarea class="form-control" name="description" rows="6" placeholder="Describe the issue or idea…" required></textarea>
+              <div class="invalid-feedback">Please describe your issue/idea.</div>
+            </div>
+
+            <div class="mt-2">
+              <label class="form-label">Attachment (optional)</label>
+              <input type="file" class="form-control" name="attachment" accept=".png,.jpg,.jpeg,.pdf,.mp4,.mov,.txt,.log">
+              <div class="form-text">Screenshots, PDFs, short clips, or logs can help.</div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 mt-3">
+              <button type="submit" class="btn btn-primary">Submit Ticket</button>
+              <span id="submitMsg" class="text-muted"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card card-help">
+        <div class="card-body">
+          <h5 class="mb-3">Tips for Faster Help</h5>
+          <ul class="mb-3">
+            <li>Tell us which page or feature you were using.</li>
+            <li>Include steps to reproduce any issue.</li>
+            <li>Attach a screenshot if possible.</li>
+          </ul>
+          <div class="small text-muted">We’ll email you if you provided an address or follow up in chapter leadership channels.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(async function init(){
+  // Load chapters for the dropdown (optional context)
+  try{
+    const list = await (await fetch('/api/chapters')).json();
+    const sel = document.getElementById('chapterSelect');
+    (list||[]).sort((a,b)=> (a.name||'').localeCompare(b.name||'')).forEach(c=>{
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name || c.code || c.id;
+      sel.appendChild(opt);
+    });
+  }catch(_e){}
+
+  const form = document.getElementById('supportForm');
+  const msg  = document.getElementById('submitMsg');
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    msg.textContent = '';
+
+    // simple Bootstrap validation
+    if (!form.checkValidity()){
+      form.classList.add('was-validated');
+      return;
+    }
+
+    const data = new FormData(form);
+
+    // If chapter_id is empty but user typed something in the select (no), skip.
+    // (We rely on chapter_id; backend will resolve name.)
+
+    try{
+      const res = await fetch('/api/support/submit', { method:'POST', body: data });
+      const json = await res.json().catch(()=> ({}));
+      if (!res.ok || !json.ok){
+        throw new Error(json.error || 'Submission failed');
+      }
+      form.reset();
+      form.classList.remove('was-validated');
+      msg.className = 'text-success';
+      msg.textContent = 'Thank you! Your ticket was submitted.';
+      setTimeout(()=>{ msg.textContent = ''; }, 6000);
+    }catch(err){
+      msg.className = 'text-danger';
+      msg.textContent = 'Could not submit. Please try again.';
+    }
+  });
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+        crossorigin="anonymous"></script>
+</body>
+</html>

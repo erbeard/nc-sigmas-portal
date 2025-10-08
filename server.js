@@ -233,6 +233,28 @@ CREATE INDEX IF NOT EXISTS idx_alumni_military ON alumni_members(military_affili
 CREATE INDEX IF NOT EXISTS idx_alumni_active_duty ON alumni_members(active_duty);
 `);
 
+// --- Support tickets (suggestions/issues) ---
+ensureTable('support_tickets', `
+  CREATE TABLE IF NOT EXISTS support_tickets (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    email TEXT,
+    chapter_id TEXT,
+    chapter_name TEXT,
+    type TEXT,               -- 'issue' | 'suggestion' | 'question' | 'other'
+    subject TEXT,
+    description TEXT,
+    attachment_url TEXT,
+    status TEXT NOT NULL DEFAULT 'open',   -- 'open' | 'in_progress' | 'closed'
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
+  );
+`);
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status, created_at DESC)`); } catch {}
+
+
+
 
 /* ---------- MIGRATIONS (safe, idempotent) ---------- */
 function ensureColumn(table, column, typeSql){
@@ -682,6 +704,7 @@ app.get("/api/alumni/counts-by-chapter", (req, res) => {
   `).all();
   res.json(rows);
 });
+
 
 // Alumni chapter -> list of collegiate chapters they advise (with crest if available)
 app.get("/api/chapters/:id/advised-collegiate", (req, res) => {
@@ -1509,6 +1532,60 @@ app.post("/api/admin/advisors/upsert", (req,res)=>{
   }
 });
 
+/* --- Support attachments (disk) --- */
+const supportDir = path.join(__dirname, "public", "uploads", "support");
+fs.mkdirSync(supportDir, { recursive: true });
+
+const supportStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, supportDir),
+  filename: (_req, file, cb) => {
+    const base = slugify(path.parse(file.originalname).name);
+    const ext = path.extname(file.originalname).toLowerCase() || "";
+    cb(null, `${Date.now()}-${base}${ext}`);
+  }
+});
+const supportUpload = multer({ storage: supportStorage });
+
+/* ---------- Public: Support ticket submit ---------- */
+app.post("/api/support/submit", supportUpload.single("attachment"), (req, res) => {
+  const { name, email, chapter_id, chapter_name, type, subject, description } = req.body || {};
+  if (!subject || !description) {
+    return res.status(400).json({ error: "subject and description are required" });
+  }
+
+  // Resolve chapter name if chapter_id is provided
+  let chId = chapter_id || null;
+  let chName = (chapter_name || "").trim() || null;
+  if (chId && !chName) {
+    const r = db.prepare(`SELECT name FROM chapters WHERE id=?`).get(chId);
+    if (r?.name) chName = r.name;
+  }
+
+  const id = uuidv4();
+  const now = nowIso();
+
+  db.prepare(`
+    INSERT INTO support_tickets
+      (id, name, email, chapter_id, chapter_name, type, subject, description, attachment_url, status, created_at, updated_at)
+    VALUES
+      (?,  ?,    ?,     ?,          ?,            ?,    ?,       ?,           ?,              'open', ?,         ?)
+  `).run(
+    id,
+    name || null,
+    email || null,
+    chId,
+    chName,
+    (type || 'other').toLowerCase(),
+    subject.trim(),
+    description.trim(),
+    req.file ? `/uploads/support/${req.file.filename}` : null,
+    now,
+    now
+  );
+
+  res.json({ ok: true, id });
+});
+
 /* Admin: upsert advisor (create or update) */
 app.post("/api/admin/advisors/upsert", (req,res)=>{
   if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
@@ -1837,6 +1914,38 @@ app.post("/api/admin/calendar/reject", (req,res)=>{
   res.json({ ok:true });
 });
 
+/* ---------- Admin: Support tickets ---------- */
+app.get("/api/admin/support", (req, res) => {
+  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({ error: "Unauthorized" });
+
+  const status = (req.query.status || "").toLowerCase(); // optional: open | in_progress | closed
+  let sql = `SELECT * FROM support_tickets`;
+  const params = [];
+  if (['open','in_progress','closed'].includes(status)) {
+    sql += ` WHERE status=?`;
+    params.push(status);
+  }
+  sql += ` ORDER BY created_at DESC`;
+  res.json(db.prepare(sql).all(...params));
+});
+
+app.post("/api/admin/support/status", (req, res) => {
+  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({ error: "Unauthorized" });
+
+  const { id, status } = req.body || {};
+  if (!id || !['open','in_progress','closed'].includes((status||'').toLowerCase())) {
+    return res.status(400).json({ error: "id and valid status required" });
+  }
+
+  const row = db.prepare(`SELECT 1 FROM support_tickets WHERE id=?`).get(id);
+  if (!row) return res.status(404).json({ error: "Ticket not found" });
+
+  db.prepare(`UPDATE support_tickets SET status=?, updated_at=? WHERE id=?`)
+    .run(status.toLowerCase(), nowIso(), id);
+
+  res.json({ ok: true });
+});
+
 /* ---------- Admin: Chapter Profile (for admin.html Save Profile) ---------- */
 app.post("/api/admin/chapter-profile", (req,res)=>{
   if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
@@ -2091,6 +2200,12 @@ app.post('/api/admin/roster/status', (req,res)=>{
 
   db.prepare(`UPDATE members SET status=? WHERE id=?`).run(status, row.id);
   res.json({ ok:true });
+});
+
+app.get("/support", (req,res)=>{
+  const file = path.join(__dirname, "public", "support.html");
+  if (fs.existsSync(file)) return res.sendFile(file);
+  res.status(404).send("support.html not found");
 });
 
 /* ---------- START ---------- */
