@@ -101,6 +101,16 @@
   .mip-warning{background:#fff7ed;color:#7c2d12;border:1px solid #f59e0b}
   .mip-expired{background:#fee2e2;color:#7f1d1d;border:1px solid #ef4444}
   .mip-unknown{background:#e5e7eb;color:#374151;border:1px solid #9ca3af}
+
+ /* ---- Media Gallery ---- */
+.gallery-card .thumb{width:140px;height:140px;object-fit:cover;border-radius:10px;background:#e5e7eb}
+.gallery-card .bucket{margin-bottom:1rem}
+.gallery-card .bucket h6{margin:.5rem 0 .25rem;color:#334155;font-weight:700}
+.gallery-card .month{display:flex;flex-wrap:wrap;gap:.5rem}
+.gallery-uploader{border:2px dashed #cbd5e1;border-radius:12px;padding:1rem;text-align:center;background:#f8fafc}
+.gallery-uploader.drag{background:#eff6ff;border-color:#93c5fd}
+.gallery-actions .btn-sm{padding:.15rem .45rem}
+
 </style>
 </head><body class="bg-light">
 <nav class="navbar navbar-dark bg-dark">
@@ -327,8 +337,6 @@
       </div>
     </div>
 
-
-
     <!-- PIA KPI tiles -->
     <div class="card mt-3">
       <div class="card-header d-flex justify-content-between align-items-center">
@@ -393,7 +401,28 @@
       </div>
       <div class="card-body" id="piaDetailsContainer"></div>
     </div>
+
+     <!-- Media Gallery -->
+    <div class="card mt-3 gallery-card" id="galleryCard">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span class="section-title mb-0">Media Gallery</span>
+        <div class="gallery-actions d-flex align-items-center gap-2">
+          <input id="galleryFile" type="file" accept="image/*" multiple hidden>
+          <button id="galleryPickBtn" class="btn btn-sm btn-primary">Upload Photos</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="galleryDrop" class="gallery-uploader mb-3">
+          Drag & drop photos here, or click “Upload Photos”.
+          <div class="small text-muted">We’ll read photo metadata (EXIF) to sort by year/month.</div>
+        </div>
+        <div id="galleryBuckets"></div>
+        <div id="galleryEmpty" class="text-muted">No photos yet.</div>
+      </div>
+    </div>
 </div>
+
+
 
 <script>
 /* --- Level thresholds + icons --- */
@@ -1687,6 +1716,188 @@ function labelPipelineAsAdvisory(){
   if (sec) sec.textContent = 'Collegiate → Alumni Pipeline (Advised Chapters)';
 }
 
+/* ===== Media Gallery (per-chapter) ===== */
+function yymmBuckets(items){
+  // items: [{url, taken_at: ISO, uploaded_at: ISO, id, caption}]
+  const by = {};
+  items.forEach(it=>{
+    const d = new Date(it.taken_at || it.uploaded_at);
+    if(isNaN(d)) return;
+    const y = d.getFullYear();
+    const m = d.toLocaleString(undefined, { month:'long' });
+    by[y] = by[y] || {};
+    by[y][m] = by[y][m] || [];
+    by[y][m].push({...it, _d:d});
+  });
+  // sort newest → oldest by date within month
+  Object.values(by).forEach(mo=>{
+    Object.values(mo).forEach(arr=>arr.sort((a,b)=> b._d - a._d));
+  });
+  return by; // { 2025: { March:[...], February:[...] }, 2024:{...} }
+}
+
+function renderGallery(items){
+  const empty = document.getElementById('galleryEmpty');
+  const host  = document.getElementById('galleryBuckets');
+  host.innerHTML = '';
+  if(!items || !items.length){
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const buckets = yymmBuckets(items);
+  // years newest → oldest
+  const years = Object.keys(buckets).map(Number).sort((a,b)=>b-a);
+
+  years.forEach(Y=>{
+    const yearDiv = document.createElement('div');
+    yearDiv.className = 'bucket';
+    yearDiv.innerHTML = `<h5 class="mb-2">${Y}</h5>`;
+    const months = Object.keys(buckets[Y]);
+    // keep calendar order Jan..Dec but show newest month first visually by sorting via date of first photo
+    months.sort((ma,mb)=>{
+      const a = buckets[Y][ma][0]._d, b = buckets[Y][mb][0]._d;
+      return b - a;
+    });
+    months.forEach(M=>{
+      const mDiv = document.createElement('div');
+      mDiv.className = 'bucket';
+      mDiv.innerHTML = `<h6>${M}</h6><div class="month"></div>`;
+      const row = mDiv.querySelector('.month');
+      buckets[Y][M].forEach(ph=>{
+        const a = document.createElement('a');
+        a.href = ph.url; a.target = '_blank'; a.rel = 'noopener';
+        a.innerHTML = `<img class="thumb" src="${ph.url}" alt="" loading="lazy">`;
+        row.appendChild(a);
+      });
+      yearDiv.appendChild(mDiv);
+    });
+    host.appendChild(yearDiv);
+  });
+}
+
+/* Extract DateTimeOriginal (fallback: file lastModified) */
+async function guessTakenAtFromFile(file){
+  try{
+    const ex = await exifr.parse(file, { tiff:true, ifd0:true, exif:true });
+    const dt = ex?.DateTimeOriginal || ex?.CreateDate || ex?.ModifyDate;
+    if (dt && !isNaN(+dt)) return new Date(dt).toISOString();
+  }catch(_e){}
+  // fallback to local file's lastModified
+  if (file?.lastModified) return new Date(file.lastModified).toISOString();
+  return new Date().toISOString();
+}
+
+/* Upload one file (multipart/form-data) with optional taken_at */
+async function uploadOnePhoto(chapterId, file){
+  // Require admin key (same pattern you use elsewhere)
+  const key = getAdminKey();
+  if (!key){ alert('Admin key required. Go to Admin and save your key first.'); throw new Error('missing-admin-key'); }
+
+  const takenAt = await guessTakenAtFromFile(file);
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('taken_at', takenAt); // let backend trust this if allowed
+
+  const res = await fetch(`/api/chapters/${chapterId}/media`, {
+    method: 'POST',
+    headers: { 'x-admin-key': key }, // no content-type, browser sets boundary
+    body: fd
+  });
+  if(!res.ok){
+    const t = await res.text().catch(()=> '');
+    throw new Error(t || 'Upload failed');
+  }
+  return res.json();
+}
+
+/* Load gallery list from backend */
+async function fetchGallery(chapterId){
+  // Accept a few shapes
+  const urls = [
+    `/api/chapters/${chapterId}/media`,
+    `/api/chapters/${chapterId}/photos`,
+    `/api/chapters/${chapterId}/gallery`
+  ];
+  for (const u of urls){
+    try{
+      const r = await fetch(u, { cache:'no-store' });
+      if(!r.ok) continue;
+      const j = await r.json();
+      const arr =
+        (Array.isArray(j) ? j :
+         Array.isArray(j?.rows) ? j.rows :
+         Array.isArray(j?.data) ? j.data : []);
+      if (arr.length){
+        return arr.map(x=>({
+          id: x.id ?? x.uuid ?? x.photo_id,
+          url: x.url ?? x.photo_url ?? x.src,
+          taken_at: x.taken_at ?? x.exif_taken_at ?? x.metadata?.taken_at ?? null,
+          uploaded_at: x.uploaded_at ?? x.created_at ?? null,
+          caption: x.caption ?? ''
+        })).filter(p=>p.url);
+      }else{
+        return [];
+      }
+    }catch(_e){}
+  }
+  return [];
+}
+
+/* Wire uploader (click + drag/drop), then refresh */
+function initGalleryUploader(chapterId){
+  const pickBtn = document.getElementById('galleryPickBtn');
+  const fileIn  = document.getElementById('galleryFile');
+  const drop    = document.getElementById('galleryDrop');
+
+  pickBtn?.addEventListener('click', ()=> fileIn?.click());
+  fileIn?.addEventListener('change', async ()=>{
+    if (!fileIn.files?.length) return;
+    await uploadBatch(chapterId, Array.from(fileIn.files));
+    fileIn.value = '';
+  });
+
+  async function handleFiles(files){
+    await uploadBatch(chapterId, Array.from(files));
+  }
+
+  // drag & drop
+  ;['dragenter','dragover'].forEach(ev=>{
+    drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.add('drag'); });
+  });
+  ;['dragleave','drop'].forEach(ev=>{
+    drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag'); });
+  });
+  drop.addEventListener('drop', e=>{
+    const dt = e.dataTransfer;
+    if (dt?.files?.length) handleFiles(dt.files);
+  });
+
+  async function uploadBatch(chapterId, files){
+    pickBtn.disabled = true; pickBtn.textContent = 'Uploading…';
+    try{
+      for (const f of files){
+        await uploadOnePhoto(chapterId, f);
+      }
+      // refresh gallery
+      const list = await fetchGallery(chapterId);
+      renderGallery(list);
+    }catch(e){
+      alert('Upload error: ' + (e?.message || e));
+    }finally{
+      pickBtn.disabled = false; pickBtn.textContent = 'Upload Photos';
+    }
+  }
+}
+
+/* Boot the gallery for a chapter: load + render + wire */
+async function loadChapterGallery(chapterId){
+  const list = await fetchGallery(chapterId);
+  renderGallery(list);
+  initGalleryUploader(chapterId);
+}
+
 /* ---------------- main ---------------- */
 async function main(){
   try {
@@ -1839,6 +2050,8 @@ if (isAlumni) {
   }
 }
 
+await loadChapterGallery(id);
+
     // ---- Alumni-only: overwrite pipeline table + success pie with ADVISORY aggregate ----
     if (isAlumni) {
       labelPipelineAsAdvisory();
@@ -1874,5 +2087,6 @@ if (isAlumni) {
 }
 main();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body></html>
