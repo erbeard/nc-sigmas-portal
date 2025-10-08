@@ -69,6 +69,7 @@
 
   .mini-h{font-weight:700;color:#334155;margin-bottom:.35rem}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 </head><body class="bg-light">
  <nav class="navbar navbar-dark bg-dark">
     <div class="container d-flex align-items-center justify-content-between">
@@ -128,6 +129,55 @@
     <div class="kpi kpi-tertiary kpi-col-3">
       <div class="k-title">Collegiate Brothers</div>
       <div id="kpi-collegiate" class="k-num">—</div>
+    </div>
+  </div>
+
+  <!-- NEW: Year-over-Year Growth Chart (moved from home page) -->
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="section-title">Year-over-Year Growth</span>
+      <small class="text-muted" id="yoyRange">—</small>
+    </div>
+    <div class="card-body">
+      <canvas id="yoyGrowthChart" height="120"></canvas>
+      <small class="text-muted">Percent change in statewide active brothers vs. prior year.</small>
+    </div>
+  </div>
+
+  <div class="kpi-grid mb-3" id="honor-kpis" style="display:none">
+    <!-- (unchanged honors KPIs content) -->
+    <div class="kpi kpi-secondary kpi-col-3" style="position:relative">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="k-title">Distinguished Service Chapter</div>
+          <div id="kpi-dsc" class="k-num">—</div>
+        </div>
+        <img src="/img/dsc.png" alt="DSC" style="width:54px;height:54px;object-fit:contain;opacity:.9">
+      </div>
+      <div class="small" style="opacity:.9">Currently Financial</div>
+    </div>
+
+    <div class="kpi kpi-tertiary kpi-col-3" style="position:relative">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="k-title">James T. Floyd Hall of Fame</div>
+          <div id="kpi-jtf" class="k-num">—</div>
+        </div>
+        <img src="/img/jtf.png" alt="JTF HOF" style="width:54px;height:54px;object-fit:contain;opacity:.9">
+      </div>
+      <div class="small" style="opacity:.9">Currently Financial</div>
+    </div>
+
+    <div class="kpi kpi-primary kpi-col-6" style="position:relative">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="k-title">Life Members</div>
+          <div id="kpi-life-total" class="k-num">—</div>
+        </div>
+        <img src="/img/life_member.png" alt="Life Member" style="width:64px;height:64px;object-fit:contain;opacity:.9">
+      </div>
+      <div class="small" id="kpi-life-breakdown" style="opacity:.9">Gold — • Sapphire — • Platinum —</div>
+      <div class="small">Currently Financial</div>
     </div>
   </div>
 
@@ -970,6 +1020,144 @@ function cssVar(name, fallback){
   return v || fallback;
 }
 
+function hexToRgba(hex, a){
+  const h = hex.replace('#','');
+  const n = parseInt(h.length===3 ? h.split('').map(c=>c+c).join('') : h, 16);
+  const r=(n>>16)&255, g=(n>>8)&255, b=n&255;
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+/* ===== YoY Growth (new) ===== */
+async function fetchYearlyTotals(){
+  const urls = [
+    '/api/stats/active-brothers/by-year',
+    '/api/stats/active-brothers/yearly',
+    '/api/stats/active-brothers/series',
+    '/api/stats/membership/yearly',
+    '/api/stats/active-brothers' // last-resort generic
+  ];
+  for (const url of urls){
+    try{
+      const r = await fetch(url, { cache:'no-store' });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const rows = Array.isArray(j) ? j
+                : Array.isArray(j?.rows) ? j.rows
+                : Array.isArray(j?.data) ? j.data
+                : [];
+      if (!rows.length) continue;
+      const norm = rows.map(x => ({
+        year: +(x.year ?? x.Year ?? x.fy ?? x.FY ?? 0),
+        total: +(x.total ?? x.Total ?? x.active_members ?? x.ActiveMembers ?? x.members ?? 0)
+      })).filter(r => r.year && r.total >= 0)
+        .sort((a,b)=> a.year - b.year);
+      if (norm.length >= 2) return norm;
+    }catch(_e){}
+  }
+  return [];
+}
+
+function computeYoY(series){
+  const out = [];
+  for (let i=1; i<series.length; i++){
+    const prev = series[i-1].total || 0;
+    const curr = series[i].total || 0;
+    const pct  = (prev === 0) ? 0 : ((curr - prev) / prev) * 100;
+    out.push({ year: series[i].year, pct });
+  }
+  return out;
+}
+
+async function fetchYearlyTotals(){
+  try{
+    const r = await fetch('/api/stats/active-brothers/by-year', { cache:'no-store' });
+    const j = await r.json();
+    const rows = Array.isArray(j?.rows) ? j.rows : [];
+    return rows
+      .map(x => ({
+        year: Number(x.year),
+        total: Number(x.total || 0),
+        pct:   x.pct == null ? null : Number(x.pct),
+      }))
+      .filter(r => r.year && r.total >= 0)
+      .sort((a,b)=>a.year - b.year);
+  }catch{ return []; }
+}
+
+let yoyChart;
+async function loadYoYGrowthChart(){
+  const series = await fetchYearlyTotals();
+  const lblEl = document.getElementById('yoyRange');
+  const canvas = document.getElementById('yoyGrowthChart');
+
+  if (!series.length){
+    lblEl.textContent = '—';
+    const ctx = canvas.getContext('2d');
+    ctx.font = '14px system-ui, -apple-system';
+    ctx.fillStyle = '#6b7280';
+    ctx.fillText('No data', 8, 20);
+    return;
+  }
+
+  const labels = series.map(r => r.year);
+  const totals = series.map(r => r.total);
+  const pcts   = series.map((r,i) => r.pct ?? (i===0 ? null : ((r.total - series[i-1].total) / (series[i-1].total || 1)) * 100));
+
+  lblEl.textContent = `${labels[0]} → ${labels[labels.length-1]}`;
+
+  if (yoyChart) yoyChart.destroy();
+  const ctx = canvas.getContext('2d');
+  const royal = getComputedStyle(document.documentElement).getPropertyValue('--royal').trim() || '#0b2b7e';
+
+  yoyChart = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Total Brothers',
+          data: totals,
+          yAxisID: 'y',
+          borderWidth: 1,
+          backgroundColor: 'rgba(11, 43, 126, 0.85)',
+          borderColor: royal,
+        },
+        {
+          type: 'line',
+          label: 'YoY %',
+          data: pcts.map(v => v==null ? null : +v.toFixed(2)),
+          yAxisID: 'y1',
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 3,
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34, 197, 94, 0.2)',
+          spanGaps: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: true },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ctx.dataset.yAxisID === 'y1'
+              ? `YoY: ${ctx.parsed.y?.toFixed?.(1) ?? '—'}%`
+              : `Total: ${ctx.parsed.y?.toLocaleString?.() ?? '—'}`
+          }
+        }
+      },
+      scales: {
+        y:  { title: { display:true, text:'Total brothers' }, beginAtZero: true },
+        y1: { position:'right', title:{ display:true, text:'YoY %' }, ticks:{ callback:v=>v+'%' }, grid:{ drawOnChartArea:false } },
+        x:  { grid:{ display:false } }
+      }
+    }
+  });
+}
+
 const ICONS = {
   collegiate: () => ({
     path: google.maps.SymbolPath.CIRCLE,
@@ -1279,6 +1467,7 @@ async function init(){
   await loadTotalGrowth();
   await loadTop5Growth();
   await loadStatePiaMoneyTotals();
+   await loadYoYGrowthChart();
 }
 window.init = init;
 </script>

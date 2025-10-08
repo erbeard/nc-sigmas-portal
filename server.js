@@ -1914,6 +1914,33 @@ app.post("/api/admin/calendar/reject", (req,res)=>{
   res.json({ ok:true });
 });
 
+// Yearly statewide totals + YoY deltas from yearly_history
+app.get("/api/stats/active-brothers/by-year", (req, res) => {
+  // sum totals per year (and split by type for future use)
+  const rowsRaw = db.prepare(`
+    SELECT
+      y.year AS year,
+      SUM(y.active_members)                                         AS total,
+      SUM(CASE WHEN lower(c.type)='alumni' THEN y.active_members ELSE 0 END)      AS alumni,
+      SUM(CASE WHEN lower(c.type)='collegiate' THEN y.active_members ELSE 0 END)  AS collegiate
+    FROM yearly_history y
+    JOIN chapters c ON c.id = y.chapter_id
+    GROUP BY y.year
+    ORDER BY y.year
+  `).all();
+
+  // compute delta / pct on the Node side (SQLite window fn not required)
+  const rows = rowsRaw.map((r, i, a) => {
+    if (i === 0) return { ...r, delta: null, pct: null };
+    const prev = a[i - 1].total || 0;
+    const delta = (r.total || 0) - prev;
+    const pct = prev > 0 ? (delta / prev) * 100 : (r.total > 0 ? 100 : 0);
+    return { ...r, delta, pct };
+  });
+
+  res.json({ rows });
+});
+
 /* ---------- Admin: Support tickets ---------- */
 app.get("/api/admin/support", (req, res) => {
   if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({ error: "Unauthorized" });
