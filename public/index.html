@@ -14,7 +14,12 @@
 
   <style>
     :root{ --royal:#0b2b7e; --royal2:#0d3aa8; }
-    body { font-family: system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif; }
+    body { 
+      font-family: system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
+      background: linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.45) 100%), 
+                  url('/img/board-pic.jpg') center/cover fixed no-repeat;
+      background-color: #f8f9fa;
+    }
     .chapter-title{
       font-family:'Montserrat',system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
       font-weight:900; font-size:clamp(26px,3vw,38px); letter-spacing:.2px;
@@ -22,7 +27,7 @@
     .shadow-soft{ box-shadow:0 .25rem .75rem rgba(0,0,0,.05); }
   </style>
 </head>
-<body class="bg-light">
+<body>
 
   <!-- Nav -->
   <nav class="navbar navbar-dark bg-dark">
@@ -57,25 +62,12 @@
       <div class="col-lg-4">
         <div class="card shadow-soft">
           <div class="card-body">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <h2 class="h5 mb-0">Sign in</h2>
-              <span class="badge text-bg-secondary">Coming soon</span>
-            </div>
-            <p class="text-muted small mb-3">RBAC will enable chapter officers and state admins to manage content.</p>
-            <form onsubmit="return false;">
-              <div class="mb-2">
-                <label class="form-label small">Email</label>
-                <input type="email" class="form-control" placeholder="you@example.com" disabled>
-              </div>
-              <div class="mb-3">
-                <label class="form-label small">Password</label>
-                <input type="password" class="form-control" placeholder="••••••••" disabled>
-              </div>
-              <button class="btn btn-primary w-100" disabled>Sign in</button>
-            </form>
-            <div class="mt-2 text-center">
-              <a class="small" href="/support">Need help?</a>
-            </div>
+            <h2 class="h5 mb-3">Sign in</h2>
+            <p class="text-muted small mb-3">Access personalized content and manage chapter operations.</p>
+            <a href="/auth/login.html" class="btn btn-primary w-100 mb-2">Sign in</a>
+            <p class="text-center small text-muted mb-0">
+              Don't have an account? <a href="/auth/register.html">Create one</a>
+            </p>
           </div>
         </div>
       </div>

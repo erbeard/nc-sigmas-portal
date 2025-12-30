@@ -747,6 +747,38 @@ searchEl.addEventListener('input', ()=>{
 </script>
 <!-- ================= END PIPELINE OPPORTUNITY TRACKER ================= -->
 
+<!-- ===== Statewide Service Hours (PIA) ===== -->
+<div class="card mt-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="section-title">Service Hours — Statewide</span>
+    <small class="text-muted" id="statePiaHoursAsOf">as of —</small>
+  </div>
+  <div class="card-body">
+    <div class="kpi-grid">
+      <div class="kpi kpi-primary kpi-col-3" style="cursor:default">
+        <div class="k-title">Bigger &amp; Better Business</div>
+        <div id="state-hours-bbb" class="k-num">—</div>
+      </div>
+
+      <div class="kpi kpi-secondary kpi-col-3" style="cursor:default">
+        <div class="k-title">Social Action</div>
+        <div id="state-hours-social" class="k-num">—</div>
+      </div>
+
+      <div class="kpi kpi-tertiary kpi-col-3" style="cursor:default">
+        <div class="k-title">Education</div>
+        <div id="state-hours-education" class="k-num">—</div>
+      </div>
+
+      <div class="kpi kpi-secondary kpi-col-3" style="cursor:default">
+        <div class="k-title">Sigma Beta Club</div>
+        <div id="state-hours-sbc" class="k-num">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ===== /Statewide Service Hours (PIA) ===== -->
+
 <!-- ===== Statewide Financial Impact (PIA) ===== -->
 <div class="card mt-3">
   <div class="card-header d-flex justify-content-between align-items-center">
@@ -1399,6 +1431,8 @@ async function fetchPiaTop(program, type){
   return res.json();
 }
 
+
+
 async function loadPiaTop(){
   const [
     totalCol, totalAlu,
@@ -1435,6 +1469,69 @@ function applySearch(){
   renderList(filtered); renderMap(filtered);
 }
 
+function sumValues(rows){
+  return (rows || []).reduce((acc, r) => acc + (Number(r.value) || 0), 0);
+}
+
+function fmtHours(n){
+  if (n == null) return '—';
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+async function fetchPiaTotals(program){
+  // Use a high limit so we can sum across the whole state.
+  const [col, alu] = await Promise.all([
+    fetch(`/api/stats/pia/top?program=${encodeURIComponent(program)}&type=collegiate&limit=5000`).then(r=>r.json()),
+    fetch(`/api/stats/pia/top?program=${encodeURIComponent(program)}&type=alumni&limit=5000`).then(r=>r.json())
+  ]);
+  return {
+    total: sumValues(col.rows) + sumValues(alu.rows),
+    // if backend returns an as_of or year, we can use it; otherwise we’ll fallback later
+    as_of: col.as_of || alu.as_of || col.year || alu.year || null
+  };
+}
+
+async function loadStatePiaHours(){
+  try{
+    const [bbb, social, education, sbc] = await Promise.all([
+      fetchPiaTotals('bbb'),
+      fetchPiaTotals('social'),
+      fetchPiaTotals('education'),
+      fetchPiaTotals('sbc')
+    ]);
+
+    document.getElementById('state-hours-bbb').textContent = fmtHours(bbb.total);
+    document.getElementById('state-hours-social').textContent = fmtHours(social.total);
+    document.getElementById('state-hours-education').textContent = fmtHours(education.total);
+    document.getElementById('state-hours-sbc').textContent = fmtHours(sbc.total);
+
+    // "as of" label (use upload date if available, same pattern you used in money totals)
+    let asOf = bbb.as_of || social.as_of || education.as_of || sbc.as_of;
+    if (!asOf){
+      try{
+        const up = await (await fetch('/api/stats/yearly-last-upload')).json();
+        asOf = up?.last_upload_at || null;
+      }catch(_e){}
+    }
+
+    document.getElementById('statePiaHoursAsOf').textContent = (() => {
+      if (!asOf) return 'as of —';
+      const d = new Date(asOf);
+      return isNaN(d) ? `as of ${asOf}` : `as of ${d.toLocaleDateString()}`;
+    })();
+
+  }catch(err){
+    console.error('loadStatePiaHours failed:', err);
+    ['state-hours-bbb','state-hours-social','state-hours-education','state-hours-sbc'].forEach(id=>{
+      const el = document.getElementById(id);
+      if (el) el.textContent = '—';
+    });
+    const asOfEl = document.getElementById('statePiaHoursAsOf');
+    if (asOfEl) asOfEl.textContent = 'as of —';
+  }
+}
+
+
 async function init(){
   const res = await fetch('/api/chapters');
   allChapters = await res.json();
@@ -1464,6 +1561,7 @@ async function init(){
   await loadHonorKpis();
   await loadTop5Membership();
   await loadPiaTop();
+  await loadStatePiaHours();
   await loadTotalGrowth();
   await loadTop5Growth();
   await loadStatePiaMoneyTotals();

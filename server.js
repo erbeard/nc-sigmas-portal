@@ -10,6 +10,8 @@ const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
 require("dotenv").config();
 const { parse: parseCsvSync } = require("csv-parse/sync");
+const mailgun = require('mailgun.js');
+const FormData = require('form-data');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,6 +24,20 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const db = new Database(path.join(__dirname, "app.db"));
 db.pragma("foreign_keys = ON");
+
+// Initialize Mailgun client
+let mgClient = null;
+if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
+  try {
+    const mg = mailgun.default({
+      username: 'api',
+      key: process.env.MAILGUN_API_KEY
+    });
+    mgClient = mg;
+  } catch (err) {
+    console.warn('Mailgun initialization failed:', err.message);
+  }
+}
 
 /* ---------- SCHEMA ---------- */
 // Turn on FKs
@@ -336,11 +352,29 @@ function runMigrations(){
   // Ensure missing cols/tables exist
   ensureColumn('documents','chapter_id','TEXT');
 
-  // --- NEW: add PIA money columns (idempotent) ---
-  ensureColumn('pia_entries', 'black_spend_amount', 'REAL');            // Column N
-  ensureColumn('pia_entries', 'scholarship_funds_disbursed', 'REAL');   // Column P
+  // --- NEW: Ensure users table exists ---
+  ensureTable('users', `
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      member_number TEXT,
+      email_verified INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT
+    )
+  `);
 
-// --- NEW: social links on chapters (idempotent) ---
+  // Create indexes for users table
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`); } catch(e){}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`); } catch(e){}
+
+  // --- NEW: add PIA money columns (idempotent) ---
+  ensureColumn('pia_entries', 'black_spend_amount', 'REAL');
+  ensureColumn('pia_entries', 'scholarship_funds_disbursed', 'REAL');
+
+  // --- NEW: social links on chapters (idempotent) ---
   ensureColumn('chapters', 'instagram_url', 'TEXT');
   ensureColumn('chapters', 'facebook_url', 'TEXT');
 
@@ -1367,7 +1401,7 @@ app.post("/api/admin/pia/import", (req, res) => {
 
     const json = xlsx.utils.sheet_to_json(sheet, { defval: "", range: headerRow, raw: false });
 
-  // header normalizer (treat underscores & dashes like spaces)
+  // header normalizer (treat underscores&dashes like spaces)
 const keyOf = (labelCandidates, rowObj) => {
   const keys = Object.keys(rowObj || {});
   const normalize = k => k.toString().trim().replace(/[-_\s]+/g, " ").toLowerCase();
@@ -1577,16 +1611,6 @@ app.post("/api/admin/documents/upload", fileUpload.single("file"), (req, res) =>
   res.json({ ok: true, id, file_url: relPath });
 });
 
-/* List documents (used by resources.html) */
-app.get("/api/documents", (req,res)=>{
-  const rows = db.prepare(`
-    SELECT id, chapter_id, title, doc_type, "group", publish_date, file_url, visibility, tags
-    FROM documents
-    ORDER BY COALESCE(publish_date,'9999-12-31') DESC, title
-  `).all();
-  res.json(rows);
-});
-
 /* Admin: upsert advisor (create or update) */
 app.post("/api/admin/advisors/upsert", (req,res)=>{
   if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
@@ -1671,653 +1695,240 @@ app.post("/api/support/submit", supportUpload.single("attachment"), (req, res) =
   res.json({ ok: true, id });
 });
 
-/* Admin: upsert advisor (create or update) */
-app.post("/api/admin/advisors/upsert", (req,res)=>{
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
-
-  const {
-    id,
-    chapter_id,             // the advised chapter (where the advisor appears)
-    advising_chapter_id,    // the alumni chapter doing the advising
-    name,
-    email,
-    phone,
-    role,
-    photo_url,
-    order_index
-  } = req.body || {};
-
-  if (!chapter_id || !name) return res.status(400).json({error:"chapter_id and name are required"});
-
-  // both chapter ids should exist if provided
-  const targetExists  = db.prepare(`SELECT 1 FROM chapters WHERE id=?`).get(chapter_id);
-  if (!targetExists) return res.status(400).json({error:"Unknown chapter_id"});
-
-  if (advising_chapter_id) {
-    const advisingExists = db.prepare(`SELECT 1 FROM chapters WHERE id=?`).get(advising_chapter_id);
-    if (!advisingExists) return res.status(400).json({error:"Unknown advising_chapter_id"});
-  }
-
-  const now = nowIso();
-
-  if (id){
-    const exists = db.prepare(`SELECT 1 FROM chapter_advisors WHERE id=?`).get(id);
-    if (!exists) return res.status(404).json({error:"Advisor not found"});
-
-    db.prepare(`
-      UPDATE chapter_advisors
-      SET
-        chapter_id = ?,
-        advising_chapter_id = COALESCE(?, advising_chapter_id),
-        name = ?,
-        email = ?,
-        phone = ?,
-        role = ?,
-        photo_url = ?,
-        order_index = COALESCE(?, order_index),
-        updated_at = ?
-      WHERE id = ?
-    `).run(
-      chapter_id,
-      advising_chapter_id || null,
-      name,
-      email || null,
-      phone || null,
-      role || null,
-      photo_url || null,
-      (order_index==null ? null : +order_index),
-      now,
-      id
-    );
-    return res.json({ ok:true, id });
-  } else {
-    const newId = uuidv4();
-    db.prepare(`
-      INSERT INTO chapter_advisors (
-        id, chapter_id, advising_chapter_id,
-        name, email, phone, role, photo_url,
-        order_index, created_at, updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?,0), ?, ?)
-    `).run(
-      newId, chapter_id, advising_chapter_id || null,
-      name, email || null, phone || null, role || null, photo_url || null,
-      (order_index==null ? 0 : +order_index), now, now
-    );
-    return res.json({ ok:true, id:newId });
-  }
-});
-
-/* Admin: delete advisor */
-app.delete("/api/admin/advisors/:id", (req,res)=>{
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
-  const { id } = req.params;
-  const row = db.prepare(`SELECT 1 FROM chapter_advisors WHERE id=?`).get(id);
-  if (!row) return res.status(404).json({error:"Advisor not found"});
-  db.prepare(`DELETE FROM chapter_advisors WHERE id=?`).run(id);
-  res.json({ ok:true });
-});
-
-/* Admin: reorder advisors (array of {id, order_index}) */
-app.post("/api/admin/advisors/reorder", (req,res)=>{
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
-  const items = Array.isArray(req.body?.items) ? req.body.items : [];
-  const upd = db.prepare(`UPDATE chapter_advisors SET order_index=?, updated_at=? WHERE id=?`);
-  const now = nowIso();
-  const tx = db.transaction(()=> items.forEach(it => upd.run(+it.order_index||0, now, it.id)));
-  tx();
-  res.json({ ok:true, count: items.length });
-});
-
-
-/* ---------- CALENDAR API ---------- */
-/* Storage for flyers */
-const flyersDir = path.join(__dirname, "public", "uploads", "flyers");
-fs.mkdirSync(flyersDir, { recursive: true });
-const flyerStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, flyersDir),
-  filename: (req, file, cb) => {
-    const base = slugify(path.parse(file.originalname).name);
-    const ext = path.extname(file.originalname).toLowerCase() || "";
-    cb(null, `${Date.now()}-${base}${ext}`);
-  }
-});
-const flyerUpload = multer({ storage: flyerStorage });
-
-/* Public: list approved events (FullCalendar will pass start/end) */
-app.get("/api/calendar/events", (req,res)=>{
-  const start = req.query.start || "1900-01-01";
-  const end   = req.query.end   || "2100-12-31";
-  const rows = db.prepare(`
-    SELECT e.*, c.name AS chapter_name
-    FROM events e
-    LEFT JOIN chapters c ON c.id=e.chapter_id
-    WHERE e.status='approved'
-      AND date(substr(e.start_iso,1,10)) < date(?)
-      AND date(substr(e.start_iso,1,10)) >= date(?)
-    ORDER BY e.start_iso
-  `).all(end, start);
-
-  // Map to FullCalendar event shape (uses local Eastern strings)
-  res.json(rows.map(r=>({
-    id: r.id,
-    title: r.title,
-    start: r.start_iso,
-    end: r.end_iso || null,
-    allDay: false,
-    extendedProps: {
-      chapter_id: r.chapter_id,
-      chapter_name: r.chapter_name || null,
-      location: r.location || "",
-      description: r.description || "",
-      flyer_url: r.flyer_url || null,
-      status: r.status,
-      tz: r.tz || EASTERN_TZ
-    }
-  })));
-});
-
-/* Public: submit an event -> stored as 'pending' */
-app.post("/api/calendar/submit", flyerUpload.single("flyer"), (req,res)=>{
-  const { chapter_id, title, description, location, date, start_time, end_time } = req.body || {};
-  if (!title || !date || !start_time){
-    return res.status(400).json({ error: "title, date, start_time are required" });
-  }
-  // Optional chapter_id must exist if provided
-  if (chapter_id){
-    const exists = db.prepare(`SELECT 1 FROM chapters WHERE id=?`).get(chapter_id);
-    if (!exists) return res.status(400).json({ error: "Unknown chapter_id" });
-  }
-
-  // Local Eastern strings for display
-  const start_iso = `${date}T${start_time}`;
-  const end_iso   = end_time ? `${date}T${end_time}` : null;
-
-  // UTC mirrors (satisfy DBs that enforced NOT NULL previously)
-  const start_utc = easternLocalToUtcISO(date, start_time);
-  const end_utc   = end_time ? easternLocalToUtcISO(date, end_time) : null;
-
-  const flyer_url = req.file ? `/uploads/flyers/${req.file.filename}` : null;
-  const id = uuidv4();
-
-  db.prepare(`
-    INSERT INTO events (
-      id, chapter_id, title, description, location,
-      start_iso, end_iso, start_utc, end_utc, tz,
-      flyer_url, status, created_at
-    )
-    VALUES (
-      @id, @chapter_id, @title, @description, @location,
-      @start_iso, @end_iso, @start_utc, @end_utc, @tz,
-      @flyer_url, 'pending', @created_at
-    )
-  `).run({
-    id,
-    chapter_id: chapter_id || null,
-    title: title.trim(),
-    description: description || null,
-    location: location || null,
-    start_iso,
-    end_iso,
-    start_utc,
-    end_utc,
-    tz: EASTERN_TZ,
-    flyer_url,
-    created_at: nowIso()
-  });
-
-  res.json({ ok:true, id, status:'pending' });
-});
-
-/* Get pipeline status for many members in one call */
-/* Set / update a member’s pipeline status (requires admin key) */
-app.post('/api/pipeline/transfer', (req, res) => {
-  const key = req.get('x-admin-key') || '';
-  if (key !== process.env.ADMIN_KEY) return res.status(401).send('unauthorized');
-
-  const {
-    member_number,
-    from_collegiate_chapter_id,
-    status,                     // 'collegiate' | 'transferred'
-    to_alumni_chapter_id        // required if status === 'transferred'
-  } = req.body || {};
-
-  // Basic required fields
-  if (!member_number || !from_collegiate_chapter_id || !status) {
-    return res.status(400).send('missing required fields');
-  }
-
-  const statusNorm = String(status).toLowerCase();
-  if (!['collegiate','transferred'].includes(statusNorm)) {
-    return res.status(400).send('invalid status');
-  }
-
-  // If transferring, alumni chapter must be provided
-  if (statusNorm === 'transferred' && !to_alumni_chapter_id) {
-    return res.status(400).send('missing to_alumni_chapter_id');
-  }
-
-  const nowIso = new Date().toISOString();
-  const memberNumStr = String(member_number);
-  const fromIdStr = String(from_collegiate_chapter_id);
-  const toIdStr = to_alumni_chapter_id != null ? String(to_alumni_chapter_id) : null;
-
-  const existing = db.prepare(`
-    SELECT id FROM pipeline_transfers WHERE member_number = ?
-  `).get(memberNumStr);
-
-  if (existing) {
-    // If status moves back to collegiate, clear the alumni assignment
-    db.prepare(`
-      UPDATE pipeline_transfers
-      SET status = ?,
-          to_alumni_chapter_id = CASE
-            WHEN ? = 'collegiate' THEN NULL
-            WHEN ? IS NOT NULL THEN ?
-            ELSE to_alumni_chapter_id
-          END,
-          transferred_at = CASE WHEN ? = 'transferred' THEN ? ELSE transferred_at END
-      WHERE member_number = ?
-    `).run(
-      statusNorm,
-      statusNorm,
-      toIdStr, toIdStr,
-      statusNorm, nowIso,
-      memberNumStr
-    );
-  } else {
-    db.prepare(`
-      INSERT INTO pipeline_transfers
-        (member_number, from_collegiate_chapter_id, to_alumni_chapter_id, status, transferred_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(
-      memberNumStr,
-      fromIdStr,                    // <-- NO unary +
-      toIdStr,                      // may be null
-      statusNorm,
-      statusNorm === 'transferred' ? nowIso : null
-    );
-  }
-
-  res.json({ ok: true });
-});
-
-/* Alumni page pipeline: show brothers assigned to this alumni chapter */
-app.get('/api/chapters/:alumniId/pipeline', (req, res) => {
-  const alumniId = String(req.params.alumniId); // keep as text; ids in DB are TEXT
+/* ---------- AUTH: Identify Brother (Step 1 of registration) ---------- */
+app.post('/api/auth/identify', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  
   try {
-    const rows = db.prepare(`
-      SELECT pt.member_number,
-             pt.from_collegiate_chapter_id,
-             pt.transferred_at,
-             c_from.name AS from_collegiate_name
-      FROM pipeline_transfers pt
-      LEFT JOIN chapters c_from ON c_from.id = pt.from_collegiate_chapter_id
-      WHERE pt.to_alumni_chapter_id = ? AND pt.status = 'transferred'
-      ORDER BY (pt.transferred_at IS NULL) ASC, pt.transferred_at DESC, pt.member_number
-    `).all(alumniId);
-    res.json({ rows });
-  } catch (e) {
-    res.status(500).json({ error: 'failed-alumni-pipeline' });
+    const { member_number, email, chapter_id } = req.body;
+
+    if (!member_number || !email || !chapter_id) {
+      return res.status(400).json({ error: 'Missing required fields: member_number, email, chapter_id' });
+    }
+
+    // Query all_brothers table using actual column names
+    const member = db.prepare(`
+      SELECT 
+        "Member #" as member_number,
+        "Full Name" as name,
+        email,
+        "Currently Financial" as currently_financial
+      FROM all_brothers
+      WHERE "Member #" = ? AND email = ?
+    `).get(member_number, email);
+
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found. Verify Member ID and email match your records.' });
+    }
+
+    // Check if currently financial
+    const toBool = (v) => {
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'number') return v !== 0;
+      const s = String(v ?? '').trim().toLowerCase();
+      return ['true','t','yes','y','1','x'].includes(s);
+    };
+
+    if (!toBool(member.currently_financial)) {
+      return res.status(403).json({ error: 'Your membership is not currently financial. Please contact your chapter.' });
+    }
+
+    // Get chapter name
+    const chapter = db.prepare('SELECT name FROM chapters WHERE id = ?').get(chapter_id);
+    if (!chapter) {
+      return res.status(400).json({ error: 'Unknown chapter_id' });
+    }
+
+    return res.status(200).json({
+      id: member.member_number,
+      name: member.name,
+      email: member.email,
+      member_number: member.member_number,
+      chapter_id: chapter_id,
+      chapter: chapter.name
+    });
+
+  } catch (error) {
+    console.error('Auth identify error:', error);
+    return res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });
 
-/* Admin: list pending events */
-app.get("/api/admin/calendar/pending", (req,res)=>{
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
-  const rows = db.prepare(`
-    SELECT e.*, c.name AS chapter_name
-    FROM events e
-    LEFT JOIN chapters c ON c.id=e.chapter_id
-    WHERE e.status='pending'
-    ORDER BY e.created_at DESC
-  `).all();
-  res.json(rows);
-});
+/* ---------- AUTH: Register (Step 2 - Create account) ---------- */
+app.post('/api/auth/register', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
 
-/* Admin: approve event */
-app.post("/api/admin/calendar/approve", (req,res)=>{
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
-  const { id } = req.body || {};
-  if (!id) return res.status(400).json({error:"id required"});
-  const row = db.prepare(`SELECT 1 FROM events WHERE id=?`).get(id);
-  if (!row) return res.status(404).json({error:"Event not found"});
+  try {
+    const { username, password, member_number, email, chapter_id } = req.body || {};
 
-  db.prepare(`UPDATE events SET status='approved', approved_at=? WHERE id=?`).run(nowIso(), id);
-  res.json({ ok:true });
-});
+    console.log('Register request body:', { username, password: '***', member_number, email, chapter_id });
 
-/* Admin: reject (mark rejected) */
-app.post("/api/admin/calendar/reject", (req,res)=>{
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
-  const { id } = req.body || {};
-  if (!id) return res.status(400).json({error:"id required"});
-  const row = db.prepare(`SELECT 1 FROM events WHERE id=?`).get(id);
-  if (!row) return res.status(404).json({error:"Event not found"});
+    // Detailed field validation
+    const missing = [];
+    if (!username) missing.push('username');
+    if (!password) missing.push('password');
+    if (!member_number) missing.push('member_number');
+    if (!email) missing.push('email');
+    // chapter_id is optional but nice to have
 
-  db.prepare(`UPDATE events SET status='rejected' WHERE id=?`).run(id);
-  res.json({ ok:true });
-});
-
-// Yearly statewide totals + YoY deltas from yearly_history
-app.get("/api/stats/active-brothers/by-year", (req, res) => {
-  // sum totals per year (and split by type for future use)
-  const rowsRaw = db.prepare(`
-    SELECT
-      y.year AS year,
-      SUM(y.active_members)                                         AS total,
-      SUM(CASE WHEN lower(c.type)='alumni' THEN y.active_members ELSE 0 END)      AS alumni,
-      SUM(CASE WHEN lower(c.type)='collegiate' THEN y.active_members ELSE 0 END)  AS collegiate
-    FROM yearly_history y
-    JOIN chapters c ON c.id = y.chapter_id
-    GROUP BY y.year
-    ORDER BY y.year
-  `).all();
-
-  // compute delta / pct on the Node side (SQLite window fn not required)
-  const rows = rowsRaw.map((r, i, a) => {
-    if (i === 0) return { ...r, delta: null, pct: null };
-    const prev = a[i - 1].total || 0;
-    const delta = (r.total || 0) - prev;
-    const pct = prev > 0 ? (delta / prev) * 100 : (r.total > 0 ? 100 : 0);
-    return { ...r, delta, pct };
-  });
-
-  res.json({ rows });
-});
-
-/* ---------- Admin: Support tickets ---------- */
-app.get("/api/admin/support", (req, res) => {
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({ error: "Unauthorized" });
-
-  const status = (req.query.status || "").toLowerCase(); // optional: open | in_progress | closed
-  let sql = `SELECT * FROM support_tickets`;
-  const params = [];
-  if (['open','in_progress','closed'].includes(status)) {
-    sql += ` WHERE status=?`;
-    params.push(status);
-  }
-  sql += ` ORDER BY created_at DESC`;
-  res.json(db.prepare(sql).all(...params));
-});
-
-app.post("/api/admin/support/status", (req, res) => {
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({ error: "Unauthorized" });
-
-  const { id, status } = req.body || {};
-  if (!id || !['open','in_progress','closed'].includes((status||'').toLowerCase())) {
-    return res.status(400).json({ error: "id and valid status required" });
-  }
-
-  const row = db.prepare(`SELECT 1 FROM support_tickets WHERE id=?`).get(id);
-  if (!row) return res.status(404).json({ error: "Ticket not found" });
-
-  db.prepare(`UPDATE support_tickets SET status=?, updated_at=? WHERE id=?`)
-    .run(status.toLowerCase(), nowIso(), id);
-
-  res.json({ ok: true });
-});
-
-/* ---------- Admin: Chapter Profile (for admin.html Save Profile) ---------- */
-app.post("/api/admin/chapter-profile", (req,res)=>{
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
-  const { chapter_id, crest_url, president_name, president_email, president_photo_url } = req.body||{};
-  if (!chapter_id) return res.status(400).json({error:"chapter_id required"});
-  const exists = db.prepare(`SELECT 1 FROM chapters WHERE id=?`).get(chapter_id);
-  if (!exists) return res.status(400).json({error:"Unknown chapter_id"});
-
-  db.prepare(`
-    INSERT INTO chapter_profiles (chapter_id, crest_url, president_name, president_email, president_photo_url)
-    VALUES (@chapter_id, @crest_url, @president_name, @president_email, @president_photo_url)
-    ON CONFLICT(chapter_id) DO UPDATE SET
-      crest_url=excluded.crest_url,
-      president_name=excluded.president_name,
-      president_email=excluded.president_email,
-      president_photo_url=excluded.president_photo_url
-  `).run({ chapter_id, crest_url, president_name, president_email, president_photo_url });
-
-  res.json({ ok:true });
-});
-
-/* ---------- Admin: Roster import (Full Roster Excel) ---------- */
-app.post("/api/admin/roster/import", memoryUpload.single("rosterFile"), (req, res) => {
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({ error: "Unauthorized" });
-  const f = req.file; if (!f) return res.status(400).json({ error: "Upload rosterFile" });
-
-  // Read first sheet
-  const wb = xlsx.read(f.buffer, { type:"buffer" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  if (!ws) return res.status(400).json({ error: "No sheet found" });
-
-  const rows = xlsx.utils.sheet_to_json(ws, { defval: "" }); // array of objects by header names
-
-  // Expected headers: Chapter, First Name, Last Name, Member Number, Initiated date, Years Paid, Status (optional)
-  const nameToId = new Map(db.prepare(`SELECT id,name FROM chapters`).all().map(r => [r.name.toLowerCase(), r.id]));
-
-  const upsert = db.prepare(`
-    INSERT INTO members (id, chapter_id, first_name, last_name, member_number, initiated_date, financial_through_year, status)
-    VALUES (@id, @chapter_id, @first_name, @last_name, @member_number, @initiated_date, @financial_through_year, @status)
-    ON CONFLICT(chapter_id, member_number) DO UPDATE SET
-      first_name = excluded.first_name,
-      last_name = excluded.last_name,
-      initiated_date = excluded.initiated_date,
-      financial_through_year = excluded.financial_through_year,
-      status = excluded.status
-  `);
-
-  let imported = 0, skipped = 0, unknownChapters = new Set();
-
-  const tx = db.transaction(() => {
-    for (const r of rows) {
-      const chapterName = (r["Chapter"] || r["chapter"] || "").toString().trim();
-      if (!chapterName) { skipped++; continue; }
-      const chapter_id = nameToId.get(chapterName.toLowerCase());
-      if (!chapter_id) { unknownChapters.add(chapterName); skipped++; continue; }
-
-      const first = (r["First Name"] || r["First"] || "").toString().trim();
-      const last  = (r["Last Name"]  || r["Last"]  || "").toString().trim();
-      const memNo = (r["Member Number"] || r["Member #"] || r["Member"] || "").toString().trim();
-      if (!first && !last && !memNo) { skipped++; continue; }
-
-      const initRaw = r["Initiated date"] || r["Initiated Date"] || r["Initiation Date"] || "";
-      const initiated_date = parseExcelDate(initRaw, null);
-
-      const yrsPaid = r["Years Paid"] || r["Years paid"] || r["YearsPaid"] || "";
-      const financial_through_year = parseFinancialThrough(yrsPaid);
-
-      let status = (r["Status"] || "").toString().trim();
-      if (!status) {
-        const nowY = new Date().getFullYear();
-        status = (financial_through_year && financial_through_year >= nowY) ? "Active" : "Not Financial";
-      }
-
-      upsert.run({
-        id: uuidv4(),
-        chapter_id,
-        first_name: first || null,
-        last_name:  last  || null,
-        member_number: memNo || null,
-        initiated_date,
-        financial_through_year,
-        status
+    if (missing.length > 0) {
+      return res.status(400).json({ 
+        error: `Missing required fields: ${missing.join(', ')}`,
+        received: { username, password: '***', member_number, email, chapter_id }
       });
-      imported++;
     }
-  });
-  tx();
 
-  // Track upload
-  db.prepare(`INSERT INTO uploads (id,kind,occurred_at) VALUES (?,?,?)`).run(uuidv4(), 'roster', nowIso());
+    // Check username doesn't exist
+    const existingUser = db.prepare(
+      'SELECT id FROM users WHERE username = ?'
+    ).get(username);
 
-  res.json({
-    ok: true,
-    imported,
-    skipped,
-    unknown_chapters: Array.from(unknownChapters)
-  });
-});
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username already taken. Choose a different username.' });
+    }
 
-/* ---------- Admin: Alumni Roster (CSV) ---------- */
-app.post("/api/admin/alumni/import", memoryUpload.single("alumniFile"), (req, res) => {
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({ error: "Unauthorized" });
-  const f = req.file; if (!f) return res.status(400).json({ error: "Upload alumniFile (.csv)" });
+    const id = uuidv4();
+    const now = nowIso();
+    const hashedPassword = password;
 
-  // Try UTF-8 first, fall back to latin-1 if needed
-  let content = f.buffer.toString("utf8");
-  if (/�/.test(content)) {
-    try { content = f.buffer.toString("latin1"); } catch {}
-  }
+    db.prepare(`
+      INSERT INTO users (id, username, password_hash, email, member_number, email_verified, created_at)
+      VALUES (?, ?, ?, ?, ?, 0, ?)
+    `).run(id, username, hashedPassword, email, member_number, now);
 
-  let records;
-  try {
-    records = parseCsvSync(content, { columns: true, skip_empty_lines: true });
-  } catch (e) {
-    return res.status(400).json({ error: "Unable to parse CSV", detail: String(e.message || e) });
-  }
+    console.log(`✓ User created: ${username} (${email})`);
 
-  const upsert = db.prepare(`
-    INSERT INTO alumni_members (
-      member_number, full_name, first_name, last_name, email,
-      affiliated_chapter, affiliated_chapter_number, affiliated_chapter_region, affiliated_chapter_university,
-      initiated_chapter, initiated_chapter_region, initiated_chapter_university,
-      initiated_year, initiated_date, member_type, life_member_type, currently_financial,
-      consecutive_dues, financial_through, career_field_code, career_field,
-      military_affiliation, active_duty, last_rank_achieved, former_sbc, dsc_member,
-      dsc_number, al_locke_scholar, al_locke_scholar_number, jt_floyd_hof_member, updated_at
-    ) VALUES (
-      @member_number, @full_name, @first_name, @last_name, @email,
-      @affiliated_chapter, @affiliated_chapter_number, @affiliated_chapter_region, @affiliated_chapter_university,
-      @initiated_chapter, @initiated_chapter_region, @initiated_chapter_university,
-      @initiated_year, @initiated_date, @member_type, @life_member_type, @currently_financial,
-      @consecutive_dues, @financial_through, @career_field_code, @career_field,
-      @military_affiliation, @active_duty, @last_rank_achieved, @former_sbc, @dsc_member,
-      @dsc_number, @al_locke_scholar, @al_locke_scholar_number, @jt_floyd_hof_member, datetime('now')
-    )
-    ON CONFLICT(member_number) DO UPDATE SET
-      full_name = excluded.full_name,
-      first_name = excluded.first_name,
-      last_name = excluded.last_name,
-      email = excluded.email,
-      affiliated_chapter = excluded.affiliated_chapter,
-      affiliated_chapter_number = excluded.affiliated_chapter_number,
-      affiliated_chapter_region = excluded.affiliated_chapter_region,
-      affiliated_chapter_university = excluded.affiliated_chapter_university,
-      initiated_chapter = excluded.initiated_chapter,
-      initiated_chapter_region = excluded.initiated_chapter_region,
-      initiated_chapter_university = excluded.initiated_chapter_university,
-      initiated_year = excluded.initiated_year,
-      initiated_date = excluded.initiated_date,
-      member_type = excluded.member_type,
-      life_member_type = excluded.life_member_type,
-      currently_financial = excluded.currently_financial,
-      consecutive_dues = excluded.consecutive_dues,
-      financial_through = excluded.financial_through,
-      career_field_code = excluded.career_field_code,
-      career_field = excluded.career_field,
-      military_affiliation = excluded.military_affiliation,
-      active_duty = excluded.active_duty,
-      last_rank_achieved = excluded.last_rank_achieved,
-      former_sbc = excluded.former_sbc,
-      dsc_member = excluded.dsc_member,
-      dsc_number = excluded.dsc_number,
-      al_locke_scholar = excluded.al_locke_scholar,
-      al_locke_scholar_number = excluded.al_locke_scholar_number,
-      jt_floyd_hof_member = excluded.jt_floyd_hof_member,
-      updated_at = datetime('now')
-  `);
-
-  let inserted = 0, updated = 0, errors = 0;
-
-  const tx = db.transaction((rows) => {
-    for (const r of rows) {
-      const full_name = cleanStr(r["Full Name"]);
-      const nm = splitName(full_name);
-
-      const payload = {
-        member_number:            cleanStr(r["Member #"] || r["Member Number"]),
-        full_name,
-        first_name:               cleanStr(nm.first),
-        last_name:                cleanStr(nm.last),
-        email:                    cleanStr(r["Email"]),
-        affiliated_chapter:      cleanStr(r["Affiliated Chapter"]),
-        affiliated_chapter_number: cleanStr(r["Affiliated Chapter Number"]),
-        affiliated_chapter_region: cleanStr(r["Affiliated Chapter Region"]),
-        affiliated_chapter_university: cleanStr(r["Affiliated Chapter University/Location"]),
-        initiated_chapter:       cleanStr(r["Initiated Chapter"]),
-        initiated_chapter_region: cleanStr(r["Initiated Chapter Region"]),
-        initiated_chapter_university: cleanStr(r["Initiated Chapter University/Location"]),
-        initiated_year:          toInt(r["Initiated Year"]),
-        initiated_date:          cleanStr(r["Initiated Date"]),
-        member_type:             cleanStr(r["Member Type"]),
-        life_member_type:        cleanStr(r["Life Member Type"]),
-        currently_financial:     cleanStr(r["Currently Financial"]),
-        consecutive_dues:        cleanStr(r["Consecutive Dues"]),
-        financial_through:       toInt(r["Financial Through"]),
-        career_field_code:       cleanStr(r["Career Field Code"]),
-        career_field:            cleanStr(r["Career Field"]),
-        military_affiliation:    cleanStr(r["Military Affiliation"]),
-        active_duty:             cleanStr(r["Active Duty"]),
-        last_rank_achieved:      cleanStr(r["Last Rank Achieved"]),
-        former_sbc:              cleanStr(r["Former SBC"]),
-        dsc_member:              cleanStr(r["DSC Member"]),
-        dsc_number:              cleanStr(r["DSC Number"]),
-        al_locke_scholar:        cleanStr(r["AL Locke Scholar"]),
-        al_locke_scholar_number: cleanStr(r["AL Locke Scholar Number"]),
-        jt_floyd_hof_member:     cleanStr(r["JT Floyd HoF Member"])
+    // Send validation email via Mailgun
+    if (mgClient && process.env.MAILGUN_DOMAIN) {
+      const messageData = {
+        from: process.env.MAILGUN_FROM_EMAIL || 'noreply@pbsnc.org',
+        to: email,
+        subject: 'Welcome to PBSNC Portal — Verify Your Email',
+        html: `
+          <h2>Welcome, ${username}!</h2>
+          <p>Your account has been successfully created on the PBSNC Portal.</p>
+          <p><strong>Username:</strong> ${username}</p>
+          <p><strong>Member Number:</strong> ${member_number}</p>
+          <p>Thank you for joining the Phi Beta Sigma brotherhood. Your account is active and ready to use.</p>
+          <hr>
+          <p style="font-size:12px; color:#666;">
+            If you did not create this account, please contact support immediately.
+          </p>
+        `
       };
 
-      if (!payload.member_number) { errors++; continue; }
-      const existed = db.prepare(`SELECT 1 FROM alumni_members WHERE member_number=?`).get(payload.member_number);
-      upsert.run(payload);
-      existed ? updated++ : inserted++;
+      mgClient.messages.create(process.env.MAILGUN_DOMAIN, messageData)
+        .then(msg => {
+          console.log(`✓ Validation email sent to ${email}:`, msg.id);
+        })
+        .catch(err => {
+          console.error(`✗ Failed to send email to ${email}:`, err);
+        });
     }
-  });
+
+    return res.status(201).json({
+      message: 'Account created successfully. Welcome to PBSNC Portal!',
+      user: { id, username, email }
+    });
+
+  } catch (error) {
+    console.error('Auth register error:', error);
+    return res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+});
+
+/* ---------- AUTH: Login ---------- */
+app.post('/api/auth/login', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
 
   try {
-    tx(records);
-  } catch (e) {
-    return res.status(500).json({ error: "DB upsert failed", detail: String(e.message || e) });
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    const user = db.prepare(
+      'SELECT id, username, email, member_number, password_hash FROM users WHERE username = ?'
+    ).get(username);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials.' });
+    }
+
+    // Compare password (plaintext for now - upgrade to bcrypt in production)
+    if (user.password_hash !== password) {
+      return res.status(401).json({ error: 'Invalid credentials.' });
+    }
+
+    // Check financial status from all_brothers using actual column names
+    const member = db.prepare(
+      'SELECT "Currently Financial", "Financial Through" FROM all_brothers WHERE "Member #" = ?'
+    ).get(user.member_number);
+
+    const toBool = (v) => {
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'number') return v !== 0;
+      const s = String(v ?? '').trim().toLowerCase();
+      return ['true','t','yes','y','1','x'].includes(s);
+    };
+
+    if (!member || !toBool(member['Currently Financial'])) {
+      return res.status(403).json({ error: 'Your membership is not currently financial.' });
+    }
+
+    // Generate simple token (in production use JWT)
+    const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+
+    return res.json({
+      token,
+      user: { id: user.id, username: user.username, email: user.email }
+    });
+
+  } catch (error) {
+    console.error('Auth login error:', error);
+    return res.status(500).json({ error: 'Server error: ' + error.message });
   }
-
-  db.prepare(`INSERT INTO uploads (id,kind,occurred_at) VALUES (?,?,?)`)
-    .run(uuidv4(), "alumni_csv", new Date().toISOString());
-
-  return res.json({ ok: true, inserted, updated, errors, total: records.length });
 });
 
-/* Admin: update a member status (by internal member id) */
-app.post("/api/admin/roster/member/status", (req,res)=>{
-  if (req.get("x-admin-key") !== ADMIN_KEY) return res.status(401).json({error:"Unauthorized"});
-  const { id, status } = req.body || {};
-  if (!id || !status) return res.status(400).json({error:"id and status required"});
-  const valid = ["Active","Not Financial","Graduated","Inactive","Suspended","Alumni"];
-  if (!valid.includes(status)) return res.status(400).json({error:"Invalid status"});
-  const row = db.prepare(`SELECT 1 FROM members WHERE id=?`).get(id);
-  if (!row) return res.status(404).json({error:"Member not found"});
-  db.prepare(`UPDATE members SET status=? WHERE id=?`).run(status, id);
-  res.json({ ok:true });
+/* ---------- PUBLIC: All Brothers (for pipeline tracker) ---------- */
+app.get('/api/all-brothers', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  
+  try {
+    const rows = db.prepare(`
+      SELECT 
+        "Member #" as member_number,
+        "Full Name" as name,
+        email,
+        status,
+        chapter_id,
+        "Financial Through" as financial_through,
+        transitioned_alumni_chapter_id
+      FROM all_brothers
+      ORDER BY "Full Name" COLLATE NOCASE
+    `).all();
+    
+    res.json(rows);
+  } catch (error) {
+    console.error('Failed to fetch all_brothers:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
 });
 
-/* Admin: update a member status (by chapter + id OR member_number) — this is what your dropdown uses */
-app.post('/api/admin/roster/status', (req,res)=>{
-  if (req.get('x-admin-key') !== ADMIN_KEY) return res.status(401).json({error:'Unauthorized'});
-  const { chapter_id, member_id, status } = req.body||{};
-  if(!chapter_id || !member_id || !status) return res.status(400).json({error:'chapter_id, member_id, status required'});
-  const valid = ["Active","Not Financial","Graduated","Inactive","Suspended","Alumni"];
-  if (!valid.includes(status)) return res.status(400).json({error:"Invalid status"});
+/* ---------- ADMIN: Delete user (for testing) ---------- */
+app.delete('/api/admin/users/:id', (req, res) => {
+  const key = req.get('x-admin-key') || '';
+  if (key !== process.env.ADMIN_KEY) return res.status(401).json({ error: 'Unauthorized' });
 
-  const row = db.prepare(`SELECT id FROM members WHERE chapter_id=? AND (id=? OR member_number=?)`)
-                .get(chapter_id, member_id, member_id);
-  if (!row) return res.status(404).json({error:"Member not found for chapter"});
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ error: 'User ID required' });
 
-  db.prepare(`UPDATE members SET status=? WHERE id=?`).run(status, row.id);
-  res.json({ ok:true });
-});
+  const row = db.prepare(`SELECT id FROM users WHERE id = ?`).get(id);
+  if (!row) return res.status(404).json({ error: 'User not found' });
 
-app.get("/support", (req,res)=>{
-  const file = path.join(__dirname, "public", "support.html");
-  if (fs.existsSync(file)) return res.sendFile(file);
-  res.status(404).send("support.html not found");
+  db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
+  res.json({ ok: true, message: `User ${id} deleted` });
 });
 
 /* ---------- START ---------- */
